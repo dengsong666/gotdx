@@ -1,0 +1,9 @@
+.git
+.github
+docs
+examples
+Dockerfile
+*.log
+tmp
+dist
+bin

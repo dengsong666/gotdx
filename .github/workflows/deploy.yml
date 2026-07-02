@@ -1,0 +1,197 @@
+name: Build and Deploy Gotdx
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  DEPLOY_DIR: /opt/stock
+
+concurrency:
+  group: stock-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deploy on server
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          GHCR_PAT: ${{ secrets.GHCR_PAT }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          envs: GHCR_PAT
+          timeout: 10m
+          command_timeout: 120m
+          script: |
+            set -e
+            flock /tmp/stock-deploy.lock sh -s <<'EOF'
+            set -e
+            step() {
+              name="$1"
+              shift
+              start="$(date +%s)"
+              echo "::group::${name}"
+              echo "[deploy] ${name} started at $(date -Is)"
+              "$@" || { end="$(date +%s)"; echo "[deploy] ${name} FAILED in $((end - start))s"; echo "::endgroup::"; return 1; }
+              end="$(date +%s)"
+              echo "[deploy] ${name} finished in $((end - start))s"
+              echo "::endgroup::"
+            }
+            wait_health() {
+              for i in $(seq 1 24); do
+                if docker compose exec -T tdx wget -qO- http://127.0.0.1:8181/api/methods >/dev/null; then
+                  return 0
+                fi
+                sleep 5
+              done
+              docker logs --tail 120 stock-tdx-1
+              return 1
+            }
+            cd /opt/stock
+            if ! docker compose config --services | grep -qx tdx; then
+              echo "tdx service is missing in /opt/stock/docker-compose.yml. Deploy server repo first."
+              exit 1
+            fi
+
+            step "Login to GHCR mirror" sh -c '
+              echo "$GHCR_PAT" | docker login ghcr.milu.moe -u dengsong666 --password-stdin
+            '
+
+            step "Pull gotdx image" sh -c '
+              docker pull ghcr.milu.moe/dengsong666/gotdx:latest && \
+              docker tag ghcr.milu.moe/dengsong666/gotdx:latest ghcr.io/dengsong666/gotdx:latest
+            '
+
+            step "Restart tdx container" docker compose up -d --no-build --force-recreate tdx
+            step "Health check tdx" wait_health
+            EOF
+
+      - name: Collect deployment report
+        if: always()
+        id: report
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          timeout: 10m
+          command_timeout: 2m
+          script: |
+            set +e
+            {
+              echo "Project: gotdx"
+              echo "Result: ${{ job.status }}"
+              echo "Repository: ${{ github.repository }}"
+              echo "Branch: ${{ github.ref_name }}"
+              echo "Commit: ${{ github.sha }}"
+              echo "Actor: ${{ github.actor }}"
+              echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              echo
+              echo "Health:"
+              cd /opt/stock && docker compose exec -T tdx wget -qO- http://127.0.0.1:8181/api/methods || true
+              echo
+              echo
+              echo "Disk:"
+              df -h /
+              echo
+              echo "Images:"
+              docker image ls ghcr.io/dengsong666/gotdx:latest --format "{{.Repository}}:{{.Tag}} {{.Size}}"
+              echo
+              echo "Containers:"
+              cd /opt/stock && docker compose ps
+              echo
+              echo "Gotdx logs:"
+              docker logs --tail 80 stock-tdx-1 2>&1
+            } > /tmp/stock-deploy-report-gotdx.txt
+            cat /tmp/stock-deploy-report-gotdx.txt
+
+      - name: Send deployment email
+        if: always()
+        continue-on-error: true
+        env:
+          MAIL_SERVER: ${{ secrets.MAIL_SERVER }}
+          MAIL_PORT: ${{ secrets.MAIL_PORT }}
+          MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+          DEPLOY_RESULT: ${{ job.status }}
+          DEPLOY_PROJECT: gotdx
+          DEPLOY_REPOSITORY: ${{ github.repository }}
+          DEPLOY_BRANCH: ${{ github.ref_name }}
+          DEPLOY_COMMIT: ${{ github.sha }}
+          DEPLOY_ACTOR: ${{ github.actor }}
+          DEPLOY_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          DEPLOY_REPORT: ${{ steps.report.outputs.stdout }}
+        run: |
+          python - <<'PY'
+          import os
+          import smtplib
+          import sys
+          from email.message import EmailMessage
+
+          required = ['MAIL_SERVER', 'MAIL_PORT', 'MAIL_USERNAME', 'MAIL_PASSWORD', 'MAIL_FROM', 'MAIL_TO']
+          missing = [name for name in required if not os.environ.get(name)]
+          if missing:
+              print(f"::warning::Skip deployment email, missing mail secrets: {', '.join(missing)}")
+              sys.exit(0)
+
+          result = os.environ['DEPLOY_RESULT']
+          project = os.environ['DEPLOY_PROJECT']
+          subject = f"[Stock] {project} deploy {result} - {os.environ['DEPLOY_COMMIT'][:7]}"
+          body = os.environ.get('DEPLOY_REPORT') or "\n".join([
+              f"Project: {project}",
+              f"Result: {result}",
+              f"Repository: {os.environ['DEPLOY_REPOSITORY']}",
+              f"Branch: {os.environ['DEPLOY_BRANCH']}",
+              f"Commit: {os.environ['DEPLOY_COMMIT']}",
+              f"Actor: {os.environ['DEPLOY_ACTOR']}",
+              f"Run: {os.environ['DEPLOY_RUN_URL']}",
+          ])
+
+          msg = EmailMessage()
+          msg['Subject'] = subject
+          msg['From'] = os.environ['MAIL_FROM']
+          msg['To'] = os.environ['MAIL_TO']
+          msg.set_content(body)
+
+          try:
+              with smtplib.SMTP_SSL(os.environ['MAIL_SERVER'], int(os.environ['MAIL_PORT']), timeout=20) as smtp:
+                  smtp.login(os.environ['MAIL_USERNAME'], os.environ['MAIL_PASSWORD'])
+                  smtp.send_message(msg)
+          except Exception as exc:
+              print(f"::warning::Deployment email send failed: {exc}")
+              sys.exit(0)
+          PY

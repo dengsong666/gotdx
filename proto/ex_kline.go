@@ -42,7 +42,8 @@ type ExKLineItem struct {
 	Close     float64
 	Amount    float64
 	Vol       uint32
-	Last      float64 // 昨收盘价
+	PreClose  float64 // 昨收价
+	LastClose float64 // 前收价
 	RisePrice float64 // 涨跌价
 	RiseRate  float64 // 涨跌幅
 }
@@ -94,7 +95,7 @@ func (obj *ExGetKLine) ParseResponse(header *RespHeader, data []byte) error {
 	obj.reply.Count = binary.LittleEndian.Uint16(data[18:20])
 	pos := 20
 
-	var lastRaw float64 // 昨收盘价
+	var preCloseRaw float64 // 昨收盘价
 
 	for i := uint16(0); i < obj.reply.Count; i++ {
 		if pos+32 > len(data) {
@@ -114,8 +115,9 @@ func (obj *ExGetKLine) ParseResponse(header *RespHeader, data []byte) error {
 			Amount:   float64(math.Float32frombits(binary.LittleEndian.Uint32(data[pos+20 : pos+24]))),
 			Vol:      binary.LittleEndian.Uint32(data[pos+24 : pos+28]),
 		}
-		item.Last = float64(lastRaw)
-		lastRaw = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[pos+16 : pos+20])))
+		item.PreClose = float64(preCloseRaw)
+		item.LastClose = float64(preCloseRaw)
+		preCloseRaw = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[pos+16 : pos+20])))
 		item.RiseRate = item.GetRiseRate()
 		item.RisePrice = item.GetRisePrice()
 		pos += 32
@@ -129,19 +131,19 @@ func (obj *ExGetKLine) ParseResponse(header *RespHeader, data []byte) error {
 }
 
 func (bar ExKLineItem) GetRisePrice() float64 {
-	if bar.Last == 0 {
+	if bar.PreClose == 0 {
 		//稍微数据准确点，没减去0这么夸张，还是不准的
 		return bar.Close - bar.Open
 	}
-	return bar.Close - bar.Last
+	return bar.Close - bar.PreClose
 }
 
 // RiseRate 涨跌比例/涨跌幅
 func (bar ExKLineItem) GetRiseRate() float64 {
-	if bar.Last == 0 {
+	if bar.PreClose == 0 {
 		return float64(bar.Close-bar.Open) / float64(bar.Open) * 100
 	}
-	return float64(bar.Close-bar.Last) / float64(bar.Last) * 100
+	return float64(bar.Close-bar.PreClose) / float64(bar.PreClose) * 100
 }
 
 func (obj *ExGetKLine) Response() *ExGetKLineReply {

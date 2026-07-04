@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"time"
 )
 
 type ExGetKLine struct {
@@ -34,13 +35,16 @@ type ExGetKLineReply struct {
 }
 
 type ExKLineItem struct {
-	DateTime string
-	Open     float64
-	High     float64
-	Low      float64
-	Close    float64
-	Amount   float64
-	Vol      uint32
+	DateTime  time.Time
+	Open      float64
+	High      float64
+	Low       float64
+	Close     float64
+	Amount    float64
+	Vol       uint32
+	Last      float64 // 昨收盘价
+	RisePrice float64 // 涨跌价
+	RiseRate  float64 // 涨跌幅
 }
 
 func NewExGetKLine(req *ExGetKLineRequest) *ExGetKLine {
@@ -54,6 +58,7 @@ func NewExGetKLine(req *ExGetKLineRequest) *ExGetKLine {
 	obj.reqHeader.SeqID = seqID()
 	obj.reqHeader.PacketType = 0x01
 	obj.reqHeader.Method = KMSG_EXKLINE
+	req.Count = req.Count + 1
 	if req != nil {
 		obj.applyRequest(req)
 	}
@@ -89,6 +94,8 @@ func (obj *ExGetKLine) ParseResponse(header *RespHeader, data []byte) error {
 	obj.reply.Count = binary.LittleEndian.Uint16(data[18:20])
 	pos := 20
 
+	var lastRaw float64 // 昨收盘价
+
 	for i := uint16(0); i < obj.reply.Count; i++ {
 		if pos+32 > len(data) {
 			return fmt.Errorf("invalid ex kline item %d", i)
@@ -99,7 +106,7 @@ func (obj *ExGetKLine) ParseResponse(header *RespHeader, data []byte) error {
 			return fmt.Errorf("invalid ex kline datetime: %d", dateNum)
 		}
 		item := ExKLineItem{
-			DateTime: ts.Format("2006-01-02 15:04:05"),
+			DateTime: ts,
 			Open:     float64(math.Float32frombits(binary.LittleEndian.Uint32(data[pos+4 : pos+8]))),
 			High:     float64(math.Float32frombits(binary.LittleEndian.Uint32(data[pos+8 : pos+12]))),
 			Low:      float64(math.Float32frombits(binary.LittleEndian.Uint32(data[pos+12 : pos+16]))),
@@ -107,10 +114,34 @@ func (obj *ExGetKLine) ParseResponse(header *RespHeader, data []byte) error {
 			Amount:   float64(math.Float32frombits(binary.LittleEndian.Uint32(data[pos+20 : pos+24]))),
 			Vol:      binary.LittleEndian.Uint32(data[pos+24 : pos+28]),
 		}
-		obj.reply.List = append(obj.reply.List, item)
+		item.Last = float64(lastRaw)
+		lastRaw = float64(math.Float32frombits(binary.LittleEndian.Uint32(data[pos+16 : pos+20])))
+		item.RiseRate = item.GetRiseRate()
+		item.RisePrice = item.GetRisePrice()
 		pos += 32
+		if i == 0 {
+			continue
+		}
+		obj.reply.List = append(obj.reply.List, item)
 	}
+	obj.reply.Count = obj.reply.Count - 1
 	return nil
+}
+
+func (bar ExKLineItem) GetRisePrice() float64 {
+	if bar.Last == 0 {
+		//稍微数据准确点，没减去0这么夸张，还是不准的
+		return bar.Close - bar.Open
+	}
+	return bar.Close - bar.Last
+}
+
+// RiseRate 涨跌比例/涨跌幅
+func (bar ExKLineItem) GetRiseRate() float64 {
+	if bar.Last == 0 {
+		return float64(bar.Close-bar.Open) / float64(bar.Open) * 100
+	}
+	return float64(bar.Close-bar.Last) / float64(bar.Last) * 100
 }
 
 func (obj *ExGetKLine) Response() *ExGetKLineReply {
@@ -128,7 +159,8 @@ type ExGetHistoryTransactionRequest struct {
 	Date     uint32
 	Category uint8
 	Code     [43]byte
-	Count    uint16
+	// Start    uint32
+	Count uint16
 }
 
 type ExGetHistoryTransactionReply struct {
@@ -158,7 +190,7 @@ func NewExGetHistoryTransaction(req *ExGetHistoryTransactionRequest) *ExGetHisto
 	obj.reqHeader.SeqID = seqID()
 	obj.reqHeader.PacketType = 0x01
 	obj.reqHeader.Method = KMSG_EXHISTORYTRANSACTION
-	obj.request.Count = 0x78
+	// obj.request.Count = 0x78
 	if req != nil {
 		obj.applyRequest(req)
 	}
@@ -200,6 +232,7 @@ func (obj *ExGetHistoryTransaction) ParseResponse(header *RespHeader, data []byt
 		}
 		minutes := binary.LittleEndian.Uint16(data[pos : pos+2])
 		actionCode := binary.LittleEndian.Uint16(data[pos+14 : pos+16])
+		// fmt.Println(data[pos+10:pos+16], actionCode)
 		item := ExHistoryTransactionItem{
 			Time:   fmt.Sprintf("%02d:%02d", (minutes/60)%24, minutes%60),
 			Price:  binary.LittleEndian.Uint32(data[pos+2 : pos+6]),

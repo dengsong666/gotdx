@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"math"
 	"testing"
+	"time"
 )
 
 func TestRawMainProtocolBuildRequestAndParseResponse(t *testing.T) {
@@ -290,7 +291,7 @@ func TestExExperimentalMessagesBuildRequestAndParseResponse(t *testing.T) {
 		if reply.Name != "Tesla" || reply.Count != 1 || len(reply.List) != 1 {
 			t.Fatalf("unexpected reply: %+v", reply)
 		}
-		if reply.List[0].DateTime != "2026-04-11 15:00:00" || math.Abs(reply.List[0].Close-10.5) > 0.001 {
+		if reply.List[0].DateTime.Format(time.DateTime) != "2026-04-11 15:00:00" || math.Abs(reply.List[0].Close-10.5) > 0.001 {
 			t.Fatalf("unexpected item: %+v", reply.List[0])
 		}
 	})

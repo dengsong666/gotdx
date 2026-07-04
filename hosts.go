@@ -143,6 +143,21 @@ var macExHostList = []HostInfo{
 	{Name: "扩展行情2", IP: "121.37.232.167", Port: 7727},
 }
 
+var icfqsHostList = []HostInfo{
+	{Name: "华为均衡上海1", IP: "119.3.157.89", Port: 7615},
+	{Name: "华为均衡广州1", IP: "139.9.211.159", Port: 7615},
+	{Name: "华为均衡广州2", IP: "121.37.193.4", Port: 7615},
+	{Name: "华为均衡广州3", IP: "124.71.56.161", Port: 7615},
+	{Name: "华为均衡上海2", IP: "123.60.69.160", Port: 7615},
+	{Name: "华为均衡上海3", IP: "123.60.149.213", Port: 7615},
+	{Name: "腾讯上海均衡1", IP: "118.25.106.154", Port: 7615},
+	{Name: "腾讯广州均衡1", IP: "129.204.254.13", Port: 7615},
+	{Name: "腾讯广州均衡2", IP: "159.75.115.35", Port: 7615},
+	{Name: "腾讯北京均衡", IP: "82.157.190.225", Port: 7615},
+	{Name: "华为均衡5", IP: "121.36.192.253", Port: 7615},
+	{Name: "华为广州均衡5", IP: "124.71.105.217", Port: 7615},
+}
+
 // MainHosts returns the built-in main quote servers.
 func MainHosts() []HostInfo {
 	return cloneHosts(mainHostList)
@@ -168,6 +183,11 @@ func MACExHosts() []HostInfo {
 	return cloneHosts(macExHostList)
 }
 
+// ICFQSHosts returns the built-in ICFQS TQLEX servers.
+func ICFQSHosts() []HostInfo {
+	return cloneHosts(icfqsHostList)
+}
+
 // MainHostAddresses returns the built-in main quote host:port list.
 func MainHostAddresses() []string {
 	return hostAddresses(mainHostList)
@@ -191,6 +211,11 @@ func MACHostAddresses() []string {
 // MACExHostAddresses returns the built-in MAC extended-market host:port list.
 func MACExHostAddresses() []string {
 	return hostAddresses(macExHostList)
+}
+
+// ICFQSHostAddresses returns the built-in ICFQS TQLEX host:port list.
+func ICFQSHostAddresses() []string {
+	return hostAddresses(icfqsHostList)
 }
 
 // ProbeHosts concurrently dials the supplied built-in host entries and returns

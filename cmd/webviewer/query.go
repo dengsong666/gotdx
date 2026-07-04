@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"sort"
@@ -877,6 +878,7 @@ var methodDefs = []methodDef{
 			{Key: "count", Label: "总量", Type: "number", Default: "20"},
 			{Key: "sort_type", Label: "排序类型", Type: "number", Default: "14"},
 			{Key: "sort_order", Label: "排序顺序", Type: "number", Default: "1"},
+			{Key: "exclude_filter", Label: "排除过滤", Type: "number", Default: "0", Help: "位图值：新股=1 科创=2 ST=4 创业=8 互联互通=16 北交=32 核准制=64 注册制=128"},
 			{Key: "field_bitmap", Label: "字段位图", Type: "text", Default: "", Help: "留空/default=默认位图，full=20字节全1，或填写40位hex"},
 		},
 	},
@@ -890,6 +892,226 @@ var methodDefs = []methodDef{
 			{Key: "markets", Label: "市场列表", Type: "text", Default: "0,1"},
 			{Key: "codes", Label: "代码列表", Type: "text", Default: "000001,600000"},
 			{Key: "field_bitmap", Label: "字段位图", Type: "text", Default: "", Help: "留空/default=默认位图，full=20字节全1，或填写40位hex"},
+		},
+	},
+	{
+		Key:         "icfqs_topic_list_raw",
+		Label:       "ICFQS 主题列表",
+		Group:       "ICFQS 主题投资",
+		Target:      "http",
+		Description: "特色指数/主题列表。setcode: 1普通主题 2概念 4风格 5地域 6行业。",
+		Params: []methodParam{
+			{Key: "host", Label: "Host", Type: "text", Default: "", Help: "留空使用默认 ICFQS 节点"},
+			{Key: "category", Label: "分类", Type: "text", Default: "", Help: "如 X11、D01；留空不过滤"},
+			{Key: "setcode", Label: "类型", Type: "text", Default: "", Help: "1普通主题 2概念 4风格 5地域 6行业；留空不过滤"},
+			{Key: "page", Label: "页码", Type: "number", Default: "1"},
+			{Key: "table_index", Label: "表序号", Type: "number", Default: "0", Help: "ResultSets 中要展示的表，从 0 开始"},
+		},
+	},
+	{
+		Key:         "icfqs_topic_search_raw",
+		Label:       "ICFQS 主题搜索",
+		Group:       "ICFQS 主题投资",
+		Target:      "http",
+		Description: "按主题名称关键词搜索。",
+		Params: []methodParam{
+			{Key: "host", Label: "Host", Type: "text", Default: "", Help: "留空使用默认 ICFQS 节点"},
+			{Key: "keyword", Label: "关键词", Type: "text", Default: "有色"},
+			{Key: "table_index", Label: "表序号", Type: "number", Default: "0"},
+		},
+	},
+	{
+		Key:         "icfqs_new_topics_raw",
+		Label:       "ICFQS 新增主题",
+		Group:       "ICFQS 主题投资",
+		Target:      "http",
+		Description: "新增题材/主题列表。",
+		Params: []methodParam{
+			{Key: "host", Label: "Host", Type: "text", Default: "", Help: "留空使用默认 ICFQS 节点"},
+			{Key: "table_index", Label: "表序号", Type: "number", Default: "0"},
+		},
+	},
+	{
+		Key:         "icfqs_hot_topics_raw",
+		Label:       "ICFQS 热门主题",
+		Group:       "ICFQS 主题投资",
+		Target:      "http",
+		Description: "热门主题列表。",
+		Params: []methodParam{
+			{Key: "host", Label: "Host", Type: "text", Default: "", Help: "留空使用默认 ICFQS 节点"},
+			{Key: "table_index", Label: "表序号", Type: "number", Default: "0"},
+		},
+	},
+	{
+		Key:         "icfqs_topic_events_raw",
+		Label:       "ICFQS 主题事件",
+		Group:       "ICFQS 主题投资",
+		Target:      "http",
+		Description: "近期主题事件原始接口。",
+		Params: []methodParam{
+			{Key: "host", Label: "Host", Type: "text", Default: "", Help: "留空使用默认 ICFQS 节点"},
+			{Key: "table_index", Label: "表序号", Type: "number", Default: "0"},
+		},
+	},
+	{
+		Key:         "icfqs_top_topics_raw",
+		Label:       "ICFQS 领涨主题",
+		Group:       "ICFQS 主题投资",
+		Target:      "http",
+		Description: "领涨板块/热门主题排行。",
+		Params: []methodParam{
+			{Key: "host", Label: "Host", Type: "text", Default: "", Help: "留空使用默认 ICFQS 节点"},
+			{Key: "topn", Label: "数量", Type: "number", Default: "10"},
+			{Key: "table_index", Label: "表序号", Type: "number", Default: "0"},
+		},
+	},
+	{
+		Key:         "icfqs_topic_detail_raw",
+		Label:       "ICFQS 主题详情",
+		Group:       "ICFQS 主题投资",
+		Target:      "http",
+		Description: "单主题详情说明。",
+		Params: []methodParam{
+			{Key: "host", Label: "Host", Type: "text", Default: "", Help: "留空使用默认 ICFQS 节点"},
+			{Key: "code", Label: "主题代码", Type: "text", Default: "308742"},
+			{Key: "setcode", Label: "类型", Type: "text", Default: "2", Help: "1普通主题 2概念 4风格 5地域 6行业"},
+			{Key: "table_index", Label: "表序号", Type: "number", Default: "0"},
+		},
+	},
+	{
+		Key:         "icfqs_topic_kline_raw",
+		Label:       "ICFQS 主题走势",
+		Group:       "ICFQS 主题投资",
+		Target:      "http",
+		Description: "单主题趋势/K 线序列。",
+		Params: []methodParam{
+			{Key: "host", Label: "Host", Type: "text", Default: "", Help: "留空使用默认 ICFQS 节点"},
+			{Key: "code", Label: "主题代码", Type: "text", Default: "308742"},
+			{Key: "setcode", Label: "类型", Type: "text", Default: "2"},
+			{Key: "table_index", Label: "表序号", Type: "number", Default: "0"},
+		},
+	},
+	{
+		Key:         "icfqs_topic_stocks_raw",
+		Label:       "ICFQS 主题成分股",
+		Group:       "ICFQS 主题投资",
+		Target:      "http",
+		Description: "主题关联成分股列表。",
+		Params: []methodParam{
+			{Key: "host", Label: "Host", Type: "text", Default: "", Help: "留空使用默认 ICFQS 节点"},
+			{Key: "code", Label: "主题代码", Type: "text", Default: "308742"},
+			{Key: "setcode", Label: "类型", Type: "text", Default: "2"},
+			{Key: "page", Label: "页码", Type: "number", Default: "1"},
+			{Key: "size", Label: "每页数量", Type: "number", Default: "20"},
+			{Key: "table_index", Label: "表序号", Type: "number", Default: "0"},
+		},
+	},
+	{
+		Key:         "icfqs_topic_quotes_raw",
+		Label:       "ICFQS 主题行情",
+		Group:       "ICFQS 行情",
+		Target:      "http",
+		Description: "主题行情及成分股快照，默认展示 ResultSets[1]。",
+		Params: []methodParam{
+			{Key: "host", Label: "Host", Type: "text", Default: "", Help: "留空使用默认 ICFQS 节点"},
+			{Key: "setcodes", Label: "类型列表", Type: "text", Default: "2"},
+			{Key: "codes", Label: "主题代码列表", Type: "text", Default: "308742"},
+			{Key: "table_index", Label: "表序号", Type: "number", Default: "1"},
+		},
+	},
+	{
+		Key:         "icfqs_topic_rotation_raw",
+		Label:       "ICFQS 主题轮动",
+		Group:       "ICFQS 行情",
+		Target:      "http",
+		Description: "主题轮动排行。data_num: 1前后10 2前10 3前20 4前30 5后20 6后30。",
+		Params: []methodParam{
+			{Key: "host", Label: "Host", Type: "text", Default: "", Help: "留空使用默认 ICFQS 节点"},
+			{Key: "data_num", Label: "范围", Type: "number", Default: "1"},
+			{Key: "data_type", Label: "指标", Type: "number", Default: "1", Help: "1涨幅 2涨停数 3成交额 4主力净额"},
+			{Key: "data_date", Label: "周期", Type: "number", Default: "2", Help: "1近5日 2近10日 3近20日 4近30日"},
+			{Key: "theme_type", Label: "主题类型", Type: "text", Default: "0", Help: "0全部；1/2/4/5/6 为具体类型"},
+			{Key: "table_index", Label: "表序号", Type: "number", Default: "2"},
+		},
+	},
+	{
+		Key:         "icfqs_quotes_batch_raw",
+		Label:       "ICFQS 批量行情",
+		Group:       "ICFQS 行情",
+		Target:      "http",
+		Description: "ICFQS HQServ.PBCombHQ 批量行情原始接口。",
+		Params: []methodParam{
+			{Key: "host", Label: "Host", Type: "text", Default: "", Help: "留空使用默认 ICFQS 节点"},
+			{Key: "setcodes", Label: "市场列表", Type: "text", Default: "0,1"},
+			{Key: "codes", Label: "代码列表", Type: "text", Default: "000001,600000"},
+			{Key: "want_col", Label: "字段", Type: "text", Default: "CLOSE,NOW"},
+		},
+	},
+	{
+		Key:         "icfqs_lhb_detail_raw",
+		Label:       "ICFQS 个股龙虎榜",
+		Group:       "ICFQS 龙虎榜",
+		Target:      "http",
+		Description: "个股龙虎榜详情，默认使用 hot.icfqs.com。",
+		Params: []methodParam{
+			{Key: "host", Label: "Host", Type: "text", Default: "", Help: "留空使用 hot.icfqs.com:7615"},
+			{Key: "symbol", Label: "股票代码", Type: "text", Default: "000066"},
+			{Key: "start_date", Label: "开始日期", Type: "text", Default: "", Help: "YYYY-MM-DD；留空用服务端默认"},
+			{Key: "end_date", Label: "结束日期", Type: "text", Default: "", Help: "YYYY-MM-DD；留空用服务端默认"},
+			{Key: "table_index", Label: "表序号", Type: "number", Default: "0"},
+		},
+	},
+	{
+		Key:         "icfqs_yyb_detail_raw",
+		Label:       "ICFQS 营业部龙虎榜",
+		Group:       "ICFQS 龙虎榜",
+		Target:      "http",
+		Description: "营业部龙虎榜详情，默认使用 hot.icfqs.com。",
+		Params: []methodParam{
+			{Key: "host", Label: "Host", Type: "text", Default: "", Help: "留空使用 hot.icfqs.com:7615"},
+			{Key: "yyb_name", Label: "营业部", Type: "text", Default: "东方财富证券拉萨团结路第二证券营业部"},
+			{Key: "start_date", Label: "开始日期", Type: "text", Default: ""},
+			{Key: "end_date", Label: "结束日期", Type: "text", Default: ""},
+			{Key: "table_index", Label: "表序号", Type: "number", Default: "0"},
+		},
+	},
+	{
+		Key:         "icfqs_yz_detail_raw",
+		Label:       "ICFQS 游资详情",
+		Group:       "ICFQS 龙虎榜",
+		Target:      "http",
+		Description: "游资席位详情，默认使用 hot.icfqs.com。",
+		Params: []methodParam{
+			{Key: "host", Label: "Host", Type: "text", Default: "", Help: "留空使用 hot.icfqs.com:7615"},
+			{Key: "code", Label: "游资代码", Type: "text", Default: ""},
+			{Key: "start_date", Label: "开始日期", Type: "text", Default: ""},
+			{Key: "end_date", Label: "结束日期", Type: "text", Default: ""},
+			{Key: "table_index", Label: "表序号", Type: "number", Default: "0"},
+		},
+	},
+	{
+		Key:         "icfqs_mrfp_latest_date_raw",
+		Label:       "ICFQS 复盘日期",
+		Group:       "ICFQS 每日复盘",
+		Target:      "http",
+		Description: "每日复盘最新可用日期，默认使用 hot.icfqs.com。",
+		Params: []methodParam{
+			{Key: "host", Label: "Host", Type: "text", Default: "", Help: "留空使用 hot.icfqs.com:7615"},
+			{Key: "table_index", Label: "表序号", Type: "number", Default: "0"},
+		},
+	},
+	{
+		Key:         "icfqs_mrfp_raw",
+		Label:       "ICFQS 每日复盘",
+		Group:       "ICFQS 每日复盘",
+		Target:      "http",
+		Description: "每日复盘原始接口。review_type 常用值：base、jrpm、ztfx、rdgl、rq。",
+		Params: []methodParam{
+			{Key: "host", Label: "Host", Type: "text", Default: "", Help: "留空使用 hot.icfqs.com:7615"},
+			{Key: "review_type", Label: "类型", Type: "text", Default: "jrpm"},
+			{Key: "date", Label: "日期", Type: "text", Default: "", Help: "YYYYMMDD 或 YYYY-MM-DD；留空取服务端默认"},
+			{Key: "limit", Label: "数量", Type: "number", Default: "30"},
+			{Key: "table_index", Label: "表序号", Type: "number", Default: "0"},
 		},
 	},
 	{
@@ -3269,6 +3491,10 @@ func runMethod(def methodDef, params map[string]string) (queryPayload, map[strin
 		if err != nil {
 			return queryPayload{}, nil, err
 		}
+		excludeFilter, err := parseUint8Value(params, "exclude_filter", 0)
+		if err != nil {
+			return queryPayload{}, nil, err
+		}
 		fieldBitmapText := valueOrDefault(params, "field_bitmap", "")
 		fieldBitmap, err := parseMACBoardMembersQuotesFieldBitmap(fieldBitmapText)
 		if err != nil {
@@ -3279,11 +3505,12 @@ func runMethod(def methodDef, params map[string]string) (queryPayload, map[strin
 			"count":            count,
 			"sort_type":        sortType,
 			"sort_order":       sortOrder,
+			"exclude_filter":   excludeFilter,
 			"field_bitmap":     fieldBitmapText,
 			"field_bitmap_hex": hex.EncodeToString(fieldBitmap[:]),
 		}
 		payload, err := withMACClient(func(client *gotdx.Client) (queryPayload, error) {
-			reply, err := client.MACBoardMembersQuotesDynamic(boardSymbol, count, sortType, sortOrder, fieldBitmap)
+			reply, err := client.MACBoardMembersQuotesDynamicWithFilter(boardSymbol, count, sortType, sortOrder, fieldBitmap, gotdx.MACFilterType(excludeFilter))
 			if err != nil {
 				return queryPayload{}, err
 			}
@@ -3362,6 +3589,268 @@ func runMethod(def methodDef, params map[string]string) (queryPayload, map[strin
 			}, nil
 		})
 		return payload, request, err
+	case "icfqs_topic_list_raw":
+		host := valueOrDefault(params, "host", "")
+		category := valueOrDefault(params, "category", "")
+		setcode := valueOrDefault(params, "setcode", "")
+		page, err := parseUint32Value(params, "page", 1)
+		if err != nil {
+			return queryPayload{}, nil, err
+		}
+		tableIndex, err := parseICFQSTableIndex(params, 0)
+		if err != nil {
+			return queryPayload{}, nil, err
+		}
+		request := map[string]any{"host": host, "category": category, "setcode": setcode, "page": page, "table_index": tableIndex}
+		raw, err := newICFQSViewerClient(host).ICFQSTopicListRaw(context.Background(), category, setcode, int(page))
+		if err != nil {
+			return queryPayload{}, request, err
+		}
+		return payloadFromICFQSTable(raw, tableIndex), request, nil
+	case "icfqs_topic_search_raw":
+		host := valueOrDefault(params, "host", "")
+		keyword := valueOrDefault(params, "keyword", "有色")
+		tableIndex, err := parseICFQSTableIndex(params, 0)
+		if err != nil {
+			return queryPayload{}, nil, err
+		}
+		request := map[string]any{"host": host, "keyword": keyword, "table_index": tableIndex}
+		raw, err := newICFQSViewerClient(host).ICFQSSearchTopicsRaw(context.Background(), keyword)
+		if err != nil {
+			return queryPayload{}, request, err
+		}
+		return payloadFromICFQSTable(raw, tableIndex), request, nil
+	case "icfqs_new_topics_raw":
+		host := valueOrDefault(params, "host", "")
+		tableIndex, err := parseICFQSTableIndex(params, 0)
+		if err != nil {
+			return queryPayload{}, nil, err
+		}
+		request := map[string]any{"host": host, "table_index": tableIndex}
+		raw, err := newICFQSViewerClient(host).ICFQSNewTopicsRaw(context.Background())
+		if err != nil {
+			return queryPayload{}, request, err
+		}
+		return payloadFromICFQSTable(raw, tableIndex), request, nil
+	case "icfqs_hot_topics_raw":
+		host := valueOrDefault(params, "host", "")
+		tableIndex, err := parseICFQSTableIndex(params, 0)
+		if err != nil {
+			return queryPayload{}, nil, err
+		}
+		request := map[string]any{"host": host, "table_index": tableIndex}
+		raw, err := newICFQSViewerClient(host).ICFQSHotTopicsRaw(context.Background())
+		if err != nil {
+			return queryPayload{}, request, err
+		}
+		return payloadFromICFQSTable(raw, tableIndex), request, nil
+	case "icfqs_topic_events_raw":
+		host := valueOrDefault(params, "host", "")
+		tableIndex, err := parseICFQSTableIndex(params, 0)
+		if err != nil {
+			return queryPayload{}, nil, err
+		}
+		request := map[string]any{"host": host, "table_index": tableIndex}
+		raw, err := newICFQSViewerClient(host).ICFQSEventsRaw(context.Background())
+		if err != nil {
+			return queryPayload{}, request, err
+		}
+		return payloadFromICFQSTable(raw, tableIndex), request, nil
+	case "icfqs_top_topics_raw":
+		host := valueOrDefault(params, "host", "")
+		topN, err := parseUint32Value(params, "topn", 10)
+		if err != nil {
+			return queryPayload{}, nil, err
+		}
+		tableIndex, err := parseICFQSTableIndex(params, 0)
+		if err != nil {
+			return queryPayload{}, nil, err
+		}
+		request := map[string]any{"host": host, "topn": topN, "table_index": tableIndex}
+		raw, err := newICFQSViewerClient(host).ICFQSTopTopicsRaw(context.Background(), int(topN))
+		if err != nil {
+			return queryPayload{}, request, err
+		}
+		return payloadFromICFQSTable(raw, tableIndex), request, nil
+	case "icfqs_topic_detail_raw":
+		host := valueOrDefault(params, "host", "")
+		code := valueOrDefault(params, "code", "308742")
+		setcode := valueOrDefault(params, "setcode", "2")
+		tableIndex, err := parseICFQSTableIndex(params, 0)
+		if err != nil {
+			return queryPayload{}, nil, err
+		}
+		request := map[string]any{"host": host, "code": code, "setcode": setcode, "table_index": tableIndex}
+		raw, err := newICFQSViewerClient(host).ICFQSTopicDetailRaw(context.Background(), code, setcode)
+		if err != nil {
+			return queryPayload{}, request, err
+		}
+		return payloadFromICFQSTable(raw, tableIndex), request, nil
+	case "icfqs_topic_kline_raw":
+		host := valueOrDefault(params, "host", "")
+		code := valueOrDefault(params, "code", "308742")
+		setcode := valueOrDefault(params, "setcode", "2")
+		tableIndex, err := parseICFQSTableIndex(params, 0)
+		if err != nil {
+			return queryPayload{}, nil, err
+		}
+		request := map[string]any{"host": host, "code": code, "setcode": setcode, "table_index": tableIndex}
+		raw, err := newICFQSViewerClient(host).ICFQSTopicKLineRaw(context.Background(), code, setcode)
+		if err != nil {
+			return queryPayload{}, request, err
+		}
+		return payloadFromICFQSTable(raw, tableIndex), request, nil
+	case "icfqs_topic_stocks_raw":
+		host := valueOrDefault(params, "host", "")
+		code := valueOrDefault(params, "code", "308742")
+		setcode := valueOrDefault(params, "setcode", "2")
+		page, err := parseUint32Value(params, "page", 1)
+		if err != nil {
+			return queryPayload{}, nil, err
+		}
+		size, err := parseUint32Value(params, "size", 20)
+		if err != nil {
+			return queryPayload{}, nil, err
+		}
+		tableIndex, err := parseICFQSTableIndex(params, 0)
+		if err != nil {
+			return queryPayload{}, nil, err
+		}
+		request := map[string]any{"host": host, "code": code, "setcode": setcode, "page": page, "size": size, "table_index": tableIndex}
+		raw, err := newICFQSViewerClient(host).ICFQSTopicStocksRaw(context.Background(), code, setcode, int(page), int(size))
+		if err != nil {
+			return queryPayload{}, request, err
+		}
+		return payloadFromICFQSTable(raw, tableIndex), request, nil
+	case "icfqs_topic_quotes_raw":
+		host := valueOrDefault(params, "host", "")
+		codeList, err := parseICFQSCodeParams(params, "2", "308742")
+		if err != nil {
+			return queryPayload{}, nil, err
+		}
+		tableIndex, err := parseICFQSTableIndex(params, 1)
+		if err != nil {
+			return queryPayload{}, nil, err
+		}
+		request := map[string]any{"host": host, "codes": codeList, "table_index": tableIndex}
+		raw, err := newICFQSViewerClient(host).ICFQSTopicQuotesRaw(context.Background(), codeList)
+		if err != nil {
+			return queryPayload{}, request, err
+		}
+		return payloadFromICFQSTable(raw, tableIndex), request, nil
+	case "icfqs_topic_rotation_raw":
+		host := valueOrDefault(params, "host", "")
+		dataNum, err := parseUint32Value(params, "data_num", 1)
+		if err != nil {
+			return queryPayload{}, nil, err
+		}
+		dataType, err := parseUint32Value(params, "data_type", 1)
+		if err != nil {
+			return queryPayload{}, nil, err
+		}
+		dataDate, err := parseUint32Value(params, "data_date", 2)
+		if err != nil {
+			return queryPayload{}, nil, err
+		}
+		themeType := valueOrDefault(params, "theme_type", "0")
+		tableIndex, err := parseICFQSTableIndex(params, 2)
+		if err != nil {
+			return queryPayload{}, nil, err
+		}
+		request := map[string]any{"host": host, "data_num": dataNum, "data_type": dataType, "data_date": dataDate, "theme_type": themeType, "table_index": tableIndex}
+		raw, err := newICFQSViewerClient(host).ICFQSTopicRotationRaw(context.Background(), int(dataNum), int(dataType), int(dataDate), themeType)
+		if err != nil {
+			return queryPayload{}, request, err
+		}
+		return payloadFromICFQSTable(raw, tableIndex), request, nil
+	case "icfqs_quotes_batch_raw":
+		host := valueOrDefault(params, "host", "")
+		codeList, err := parseICFQSCodeParams(params, "0,1", "000001,600000")
+		if err != nil {
+			return queryPayload{}, nil, err
+		}
+		wantCols := parseCodeList(valueOrDefault(params, "want_col", "CLOSE,NOW"))
+		request := map[string]any{"host": host, "codes": codeList, "want_col": wantCols}
+		raw, err := newICFQSViewerClient(host).ICFQSQuotesBatchRaw(context.Background(), codeList, wantCols)
+		if err != nil {
+			return queryPayload{}, request, err
+		}
+		return payloadFromICFQSListItems(raw), request, nil
+	case "icfqs_lhb_detail_raw":
+		host := valueOrDefault(params, "host", "")
+		symbol := valueOrDefault(params, "symbol", "000066")
+		startDate := valueOrDefault(params, "start_date", "")
+		endDate := valueOrDefault(params, "end_date", "")
+		tableIndex, err := parseICFQSTableIndex(params, 0)
+		if err != nil {
+			return queryPayload{}, nil, err
+		}
+		request := map[string]any{"host": host, "symbol": symbol, "start_date": startDate, "end_date": endDate, "table_index": tableIndex}
+		raw, err := newICFQSViewerHotClient(host).ICFQSLHBDetailRaw(context.Background(), symbol, startDate, endDate)
+		if err != nil {
+			return queryPayload{}, request, err
+		}
+		return payloadFromICFQSTable(raw, tableIndex), request, nil
+	case "icfqs_yyb_detail_raw":
+		host := valueOrDefault(params, "host", "")
+		yybName := valueOrDefault(params, "yyb_name", "")
+		startDate := valueOrDefault(params, "start_date", "")
+		endDate := valueOrDefault(params, "end_date", "")
+		tableIndex, err := parseICFQSTableIndex(params, 0)
+		if err != nil {
+			return queryPayload{}, nil, err
+		}
+		request := map[string]any{"host": host, "yyb_name": yybName, "start_date": startDate, "end_date": endDate, "table_index": tableIndex}
+		raw, err := newICFQSViewerHotClient(host).ICFQSYYBDetailRaw(context.Background(), yybName, startDate, endDate)
+		if err != nil {
+			return queryPayload{}, request, err
+		}
+		return payloadFromICFQSTable(raw, tableIndex), request, nil
+	case "icfqs_yz_detail_raw":
+		host := valueOrDefault(params, "host", "")
+		code := valueOrDefault(params, "code", "")
+		startDate := valueOrDefault(params, "start_date", "")
+		endDate := valueOrDefault(params, "end_date", "")
+		tableIndex, err := parseICFQSTableIndex(params, 0)
+		if err != nil {
+			return queryPayload{}, nil, err
+		}
+		request := map[string]any{"host": host, "code": code, "start_date": startDate, "end_date": endDate, "table_index": tableIndex}
+		raw, err := newICFQSViewerHotClient(host).ICFQSYZDetailRaw(context.Background(), code, startDate, endDate)
+		if err != nil {
+			return queryPayload{}, request, err
+		}
+		return payloadFromICFQSTable(raw, tableIndex), request, nil
+	case "icfqs_mrfp_latest_date_raw":
+		host := valueOrDefault(params, "host", "")
+		tableIndex, err := parseICFQSTableIndex(params, 0)
+		if err != nil {
+			return queryPayload{}, nil, err
+		}
+		request := map[string]any{"host": host, "table_index": tableIndex}
+		raw, err := newICFQSViewerHotClient(host).ICFQSMRFPLatestDateRaw(context.Background())
+		if err != nil {
+			return queryPayload{}, request, err
+		}
+		return payloadFromICFQSTable(raw, tableIndex), request, nil
+	case "icfqs_mrfp_raw":
+		host := valueOrDefault(params, "host", "")
+		reviewType := valueOrDefault(params, "review_type", "jrpm")
+		date := valueOrDefault(params, "date", "")
+		limit, err := parseUint32Value(params, "limit", 30)
+		if err != nil {
+			return queryPayload{}, nil, err
+		}
+		tableIndex, err := parseICFQSTableIndex(params, 0)
+		if err != nil {
+			return queryPayload{}, nil, err
+		}
+		request := map[string]any{"host": host, "review_type": reviewType, "date": date, "limit": limit, "table_index": tableIndex}
+		raw, err := newICFQSViewerHotClient(host).ICFQSMRFPRaw(context.Background(), reviewType, date, int(limit))
+		if err != nil {
+			return queryPayload{}, request, err
+		}
+		return payloadFromICFQSTable(raw, tableIndex), request, nil
 	case "mac_capital_flow":
 		market, err := parseUint8Value(params, "market", 0)
 		if err != nil {
@@ -4936,6 +5425,188 @@ func rowsFromMACMarketMonitor(items []proto.MACMarketMonitorItem) [][]string {
 		})
 	}
 	return rows
+}
+
+func newICFQSViewerClient(host string) *gotdx.ICFQSClient {
+	if strings.TrimSpace(host) == "" {
+		return gotdx.NewICFQS()
+	}
+	return gotdx.NewICFQS(gotdx.WithICFQSAddress(host))
+}
+
+func newICFQSViewerHotClient(host string) *gotdx.ICFQSClient {
+	if strings.TrimSpace(host) == "" {
+		return gotdx.NewICFQSHot()
+	}
+	return gotdx.NewICFQSHot(gotdx.WithICFQSAddress(host))
+}
+
+func parseICFQSTableIndex(params map[string]string, def int) (int, error) {
+	value, err := parseUint32Value(params, "table_index", uint32(def))
+	if err != nil {
+		return 0, err
+	}
+	return int(value), nil
+}
+
+func parseICFQSCodeParams(params map[string]string, setcodesDefault string, codesDefault string) ([]gotdx.ICFQSCode, error) {
+	setcodes := parseCodeList(valueOrDefault(params, "setcodes", setcodesDefault))
+	codes := parseCodeList(valueOrDefault(params, "codes", codesDefault))
+	if len(codes) == 0 {
+		return nil, fmt.Errorf("codes 不能为空")
+	}
+	if len(setcodes) == 0 {
+		return nil, fmt.Errorf("setcodes 不能为空")
+	}
+	if len(setcodes) == 1 && len(codes) > 1 {
+		setcode := setcodes[0]
+		setcodes = make([]string, len(codes))
+		for i := range setcodes {
+			setcodes[i] = setcode
+		}
+	}
+	if len(setcodes) != len(codes) {
+		return nil, fmt.Errorf("setcodes 数量必须和 codes 数量一致")
+	}
+	out := make([]gotdx.ICFQSCode, 0, len(codes))
+	for i, code := range codes {
+		out = append(out, gotdx.ICFQSCode{Setcode: setcodes[i], Code: code})
+	}
+	return out, nil
+}
+
+func payloadFromICFQSTable(raw map[string]any, tableIndex int) queryPayload {
+	columns, rows := rowsFromICFQSTable(raw, tableIndex)
+	return queryPayload{
+		columns: columns,
+		rows:    rows,
+		raw: map[string]any{
+			"table_index": tableIndex,
+			"tables":      gotdx.ICFQSFormatTables(raw),
+			"raw":         raw,
+		},
+		warning: "ICFQS 原始接口直接展示指定 ResultSets 表，完整响应见 Raw。",
+	}
+}
+
+func payloadFromICFQSListItems(raw map[string]any) queryPayload {
+	columns, rows := rowsFromICFQSListItems(raw)
+	return queryPayload{
+		columns: columns,
+		rows:    rows,
+		raw:     raw,
+		warning: "ICFQS 原始接口直接展示 ListItem，完整响应见 Raw。",
+	}
+}
+
+func rowsFromICFQSTables(raw map[string]any) ([]string, [][]string) {
+	return rowsFromICFQSTable(raw, 0)
+}
+
+func rowsFromICFQSTable(raw map[string]any, tableIndex int) ([]string, [][]string) {
+	resultSets, _ := raw["ResultSets"].([]any)
+	if tableIndex < 0 || tableIndex >= len(resultSets) {
+		return nil, nil
+	}
+	resultSet, _ := resultSets[tableIndex].(map[string]any)
+	columns := columnsFromICFQSResultSet(resultSet)
+	rawRows, _ := resultSet["Content"].([]any)
+	if len(columns) == 0 {
+		columns = columnsFromICFQSContent(rawRows)
+	}
+	rows := make([][]string, 0, len(rawRows))
+	for _, rawRow := range rawRows {
+		values, _ := rawRow.([]any)
+		row := make([]string, 0, len(columns))
+		for i := range columns {
+			if i < len(values) {
+				row = append(row, formatAny(values[i]))
+			} else {
+				row = append(row, "")
+			}
+		}
+		rows = append(rows, row)
+	}
+	return columns, rows
+}
+
+func columnsFromICFQSResultSet(resultSet map[string]any) []string {
+	if rawColumns, ok := resultSet["ColName"].([]any); ok && len(rawColumns) > 0 {
+		columns := make([]string, 0, len(rawColumns))
+		for _, rawColumn := range rawColumns {
+			columns = append(columns, fmt.Sprint(rawColumn))
+		}
+		return columns
+	}
+	rawColumnDefs, _ := resultSet["ColDes"].([]any)
+	columns := make([]string, 0, len(rawColumnDefs))
+	for _, rawColumnDef := range rawColumnDefs {
+		columnDef, _ := rawColumnDef.(map[string]any)
+		if name := strings.TrimSpace(fmt.Sprint(columnDef["Name"])); name != "" {
+			columns = append(columns, name)
+		}
+	}
+	return columns
+}
+
+func columnsFromICFQSContent(rawRows []any) []string {
+	maxLen := 0
+	for _, rawRow := range rawRows {
+		values, _ := rawRow.([]any)
+		if len(values) > maxLen {
+			maxLen = len(values)
+		}
+	}
+	columns := make([]string, 0, maxLen)
+	for i := 0; i < maxLen; i++ {
+		columns = append(columns, fmt.Sprintf("col_%d", i))
+	}
+	return columns
+}
+
+func rowsFromICFQSListItems(raw map[string]any) ([]string, [][]string) {
+	head, _ := raw["ListHead"].(map[string]any)
+	rawHeads, _ := head["ItemHead"].([]any)
+	columns := make([]string, 0, len(rawHeads))
+	for _, rawHead := range rawHeads {
+		columns = append(columns, fmt.Sprint(rawHead))
+	}
+	rawItems, _ := raw["ListItem"].([]any)
+	rows := make([][]string, 0, len(rawItems))
+	for _, rawItem := range rawItems {
+		item, _ := rawItem.(map[string]any)
+		values, _ := item["Item"].([]any)
+		row := make([]string, 0, len(columns))
+		for i := range columns {
+			if i < len(values) {
+				row = append(row, formatAny(values[i]))
+			} else {
+				row = append(row, "")
+			}
+		}
+		rows = append(rows, row)
+	}
+	return columns, rows
+}
+
+func rowsFromMapRows(items []map[string]any) ([]string, [][]string) {
+	if len(items) == 0 {
+		return nil, nil
+	}
+	columns := make([]string, 0, len(items[0]))
+	for column := range items[0] {
+		columns = append(columns, column)
+	}
+	sort.Strings(columns)
+	rows := make([][]string, 0, len(items))
+	for _, item := range items {
+		row := make([]string, 0, len(columns))
+		for _, column := range columns {
+			row = append(row, formatAny(item[column]))
+		}
+		rows = append(rows, row)
+	}
+	return columns, rows
 }
 
 func rowsFromMACBelongBoards(items []proto.MACBelongBoardItem) [][]string {

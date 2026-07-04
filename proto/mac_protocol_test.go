@@ -400,6 +400,7 @@ func TestMACBoardMembersQuotesDynamicBuildRequestAndParseResponse(t *testing.T) 
 		Start:       0,
 		PageSize:    10,
 		SortOrder:   1,
+		Filter:      0x24,
 		FieldBitmap: bitmap,
 	})
 
@@ -416,7 +417,10 @@ func TestMACBoardMembersQuotesDynamicBuildRequestAndParseResponse(t *testing.T) 
 	if req.BoardCode != boardCode || req.PageSize != 10 || req.SortOrder != 1 {
 		t.Fatalf("unexpected request: %+v", req)
 	}
-	if req.FieldBitmap != bitmap {
+	wantBitmap := bitmap
+	wantBitmap[17] = 0x24
+	wantBitmap[19] = 1
+	if req.FieldBitmap != wantBitmap {
 		t.Fatalf("unexpected field bitmap: %#v", req.FieldBitmap)
 	}
 
@@ -469,6 +473,7 @@ func TestMACBoardMembersQuotesDynamicSupportsSignedAndAliasFields(t *testing.T) 
 	bitmap := [20]byte{}
 	bitmap[0x24/8] |= 1 << (0x24 % 8)
 	bitmap[0x58/8] |= 1 << (0x58 % 8)
+	bitmap[0x8d/8] |= 1 << (0x8d % 8)
 	bitmap[0x8e/8] |= 1 << (0x8e % 8)
 
 	msg := NewMACBoardMembersQuotesDynamic(&MACBoardMembersQuotesDynamicRequest{FieldBitmap: bitmap})
@@ -489,32 +494,35 @@ func TestMACBoardMembersQuotesDynamicSupportsSignedAndAliasFields(t *testing.T) 
 	name := make([]byte, 44)
 	copy(name, "PINGAN")
 	buf.Write(name)
-	writeMACFloat32(t, buf, 12.3) // pre_ipov
+	writeMACFloat32(t, buf, 12.3) // pre_iopv
 	if err := binary.Write(buf, binary.LittleEndian, int32(-7)); err != nil {
 		t.Fatal(err)
 	}
-	if err := binary.Write(buf, binary.LittleEndian, int32(-1)); err != nil {
+	if err := binary.Write(buf, binary.LittleEndian, int32(3)); err != nil {
 		t.Fatal(err)
 	}
+	writeMACFloat32(t, buf, 88.5)
 
 	if err := msg.ParseResponse(&RespHeader{}, buf.Bytes()); err != nil {
 		t.Fatalf("parse response failed: %v", err)
 	}
 	reply := msg.Response()
-	if reply.ActiveFields[0].Name != "pre_ipov" || reply.ActiveFields[0].Aliases[0] != "float_shares" {
+	if reply.ActiveFields[0].Name != "pre_iopv" || !containsString(reply.ActiveFields[0].Aliases, "pre_ipov") {
 		t.Fatalf("unexpected alias field: %+v", reply.ActiveFields)
 	}
 	item := reply.Stocks[0]
-	assertNearFloat64(t, item.Values["pre_ipov"].(float64), 12.3, "dynamic pre_ipov")
+	assertNearFloat64(t, item.Values["pre_iopv"].(float64), 12.3, "dynamic pre_iopv")
+	assertNearFloat64(t, item.Values["pre_ipov"].(float64), 12.3, "dynamic pre_ipov alias")
 	assertNearFloat64(t, item.Values["float_shares"].(float64), 12.3, "dynamic alias float_shares")
-	if item.Values["annual_limit_up_days"].(int32) != -7 || item.Values["constant_neg_one"].(int32) != -1 {
+	assertNearFloat64(t, item.Values["safety_score"].(float64), 88.5, "dynamic safety_score")
+	if item.Values["annual_limit_up_days"].(int32) != -7 || item.Values["change_up_type"].(int32) != 3 {
 		t.Fatalf("unexpected signed dynamic values: %+v", item.Values)
 	}
 }
 
 func TestMACDynamicFieldMapAlignsLatestTDX(t *testing.T) {
 	bitmap := [20]byte{}
-	bits := []int{0x16, 0x37, 0x3e, 0x48, 0x73, 0x85, 0x8c, 0x8f}
+	bits := []int{0x16, 0x37, 0x3e, 0x48, 0x6c, 0x73, 0x7b, 0x85, 0x8c, 0x8d, 0x8f, 0x90}
 	for _, bit := range bits {
 		bitmap[bit/8] |= 1 << (bit % 8)
 	}
@@ -525,14 +533,18 @@ func TestMACDynamicFieldMapAlignsLatestTDX(t *testing.T) {
 		format string
 		alias  string
 	}{
-		0x16: {name: "board_strength", format: "float32", alias: "unknown_22"},
+		0x16: {name: "board_strength", format: "int32", alias: "unknown_22"},
 		0x37: {name: "index_metric", format: "float32", alias: "unknown_55"},
 		0x3e: {name: "stock_class_code", format: "uint32", alias: "unknown_62"},
 		0x48: {name: "bid2_price", format: "float32", alias: "low_copy"},
+		0x6c: {name: "main_net_ratio", format: "float32"},
 		0x73: {name: "ddx", format: "float32"},
+		0x7b: {name: "prev_amount", format: "float32"},
 		0x85: {name: "ask5_price", format: "float32", alias: "avg_price_copy"},
 		0x8c: {name: "bid_ask_diff", format: "int32"},
-		0x8f: {name: "stock_rating", format: "float32"},
+		0x8d: {name: "change_up_type", format: "int32"},
+		0x8f: {name: "highlight_count", format: "float32", alias: "stock_rating"},
+		0x90: {name: "change_at_1000", format: "float32"},
 	}
 
 	if len(fields) != len(bits) {

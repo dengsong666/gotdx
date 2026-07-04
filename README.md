@@ -127,7 +127,8 @@ client := gotdx.New(
 | 扩展市场 | 美股/港股/期货等扩展标的列表、报价、K 线、历史成交、表格 | `ExQuotes`, `ExKLine`, `ExHistoryTransaction`, `ExTable` |
 | TDX 商品语义 | 对齐 `goods_*` 命名的商品总览、列表、报价、K 线、分时、历史成交 | `GoodsCount`, `GoodsList`, `GoodsVarieties`, `GoodsQuotes`, `GoodsKLine` |
 | F10 与文件 | 公司信息分类、正文、财务、除权除息、文件下载、板块文件 | `GetCompanyInfo`, `GetFinanceInfo`, `GetXDXRInfo`, `DownloadFullFile` |
-| MAC 协议 | 板块列表、成分股、成分报价、动态成分报价、批量股票报价、单只快照、逐笔成交、竞价、多日分时、股票摘要、资金流向、服务端交易时段、K线偏移信息、文件查询/下载、市场监控、所属板块、统一 K 线 | `MACBoardList`, `MACBoardMembers`, `MACBoardMembersWithSort`, `MACBoardMembersQuotes`, `MACBoardMembersQuotesWithSort`, `MACBoardMembersQuotesDynamic`, `MACSymbolQuotes`, `MACQuotes`, `MACTransactions`, `MACAuction`, `MACTickCharts`, `MACSymbolInfo`, `MACCapitalFlow`, `MACServerInfo`, `MACKLineOffset`, `MACMarketMonitor`, `MACSymbolBars` |
+| MAC 协议 | 板块列表、成分股、成分报价、动态成分报价、批量股票报价、单只快照、逐笔成交、竞价、多日分时、股票摘要、资金流向、服务端交易时段、K线偏移信息、文件查询/下载、市场监控、所属板块、统一 K 线 | `MACBoardList`, `MACBoardMembers`, `MACBoardMembersWithSort`, `MACBoardMembersQuotes`, `MACBoardMembersQuotesWithSort`, `MACBoardMembersQuotesDynamic`, `MACBoardMembersQuotesDynamicWithFilter`, `MACSymbolQuotes`, `MACQuotes`, `MACTransactions`, `MACAuction`, `MACTickCharts`, `MACSymbolInfo`, `MACCapitalFlow`, `MACServerInfo`, `MACKLineOffset`, `MACMarketMonitor`, `MACSymbolBars` |
+| ICFQS HTTP | 主题投资、主题行情、批量行情、龙虎榜、每日复盘等 TQLEX/JSON 原始接口 | `NewICFQS`, `PostTQL`, `ICFQSTopicListRaw`, `ICFQSQuotesBatchRaw`, `ICFQSMRFPRaw` |
 | 协议调试 | 原始协议响应、扩展实验接口、网页查看器 | `MainTodoB`, `MainClient26AD`, `ExExperiment2487`, `cmd/webviewer` |
 
 ## 项目结构
@@ -164,6 +165,7 @@ client := gotdx.New(
 | 扩展市场表格 | `go run ./examples/ex_table` / `go run ./examples/ex_table_detail` |
 | TDX 商品语义入口 | `go run ./examples/goods_overview` |
 | MAC 协议 | `go run ./examples/mac_board_list` / `go run ./examples/mac_board_members` / `go run ./examples/mac_board_members_quotes` / `go run ./examples/mac_board_members_quotes_dynamic` / `go run ./examples/mac_symbol_quotes` / `go run ./examples/mac_market_monitor` / `go run ./examples/mac_quotes` / `go run ./examples/mac_transactions` / `go run ./examples/mac_auction` / `go run ./examples/mac_tick_charts` / `go run ./examples/mac_symbol_info` / `go run ./examples/mac_capital_flow` / `go run ./examples/mac_server_info` / `go run ./examples/mac_kline_offset` / `go run ./examples/mac_file_query` / `go run ./examples/mac_symbol_belong_board` / `go run ./examples/mac_symbol_bars` |
+| ICFQS HTTP 原始接口 | `go run ./examples/icfqs_raw` |
 | 统一监控示例 | `go run ./examples/unified_watchlist` |
 
 <details>
@@ -188,6 +190,7 @@ client := gotdx.New(
 - `examples/stock_history_transaction_with_trans`
 - `examples/stock_market_watch`
 - `examples/host_probe`
+- `examples/icfqs_raw`
 - `examples/stock_transaction`
 - `examples/stock_f10_block`
 - `examples/stock_company_raw`
@@ -262,6 +265,8 @@ go run ./cmd/webviewer
 http://127.0.0.1:8080
 ```
 
+Web Viewer 中的 ICFQS HTTP 原始接口已按 `主题投资`、`行情`、`龙虎榜`、`每日复盘` 分组；多表响应可用 `table_index` 选择展示的 `ResultSets`，完整响应保留在 Raw 面板。
+
 <a id="api"></a>
 ## API 速览
 
@@ -271,14 +276,14 @@ http://127.0.0.1:8080
 - 主行情：`StockCount`, `StockList`, `StockQuotesDetail`, `StockKLine`, `StockTickChart`, `StockIndexInfo`, `StockIndexMomentum`, `StockChartSampling`, `StockAuction`, `StockTopBoard`, `StockUnusual`, `StockVolumeProfile`, `StockHistoryOrders`, `StockHistoryTransaction`, `StockF10`
 - 扩展市场：`ExCount`, `ExList`, `ExQuote`, `ExQuotes`, `ExKLine`, `ExTickChart`, `ExHistoryTransaction`, `ExTable`
 - 商品语义：`GoodsCount`, `GoodsCategoryList`, `GoodsList`, `GoodsVarieties`, `GoodsQuote`, `GoodsQuotes`, `GoodsQuotesList`, `GoodsKLine`, `GoodsTickChart`, `GoodsChartSampling`, `GoodsHistoryTransaction`
-- MAC：`MACBoardList`, `MACBoardMembers`, `MACBoardMembersWithSort`, `MACBoardMembersQuotes`, `MACBoardMembersQuotesWithSort`, `MACBoardMembersQuotesDynamic`, `MACSymbolQuotes`, `MACQuotes`, `MACQuotesWithDate`, `MACTransactions`, `MACTransactionsWithDate`, `MACAuction`, `MACTickCharts`, `MACSymbolInfo`, `MACCapitalFlow`, `MACFileList`, `MACDownloadFullFile`, `MACMarketMonitor`, `MACSymbolBelongBoard`, `MACSymbolBars`；`MACSymbolBars` 会基于返回的流通股本字段尽力补齐 `Turnover`。
+- MAC：`MACBoardList`, `MACBoardMembers`, `MACBoardMembersWithSort`, `MACBoardMembersQuotes`, `MACBoardMembersQuotesWithSort`, `MACBoardMembersQuotesDynamic`, `MACBoardMembersQuotesDynamicWithFilter`, `MACSymbolQuotes`, `MACQuotes`, `MACQuotesWithDate`, `MACTransactions`, `MACTransactionsWithDate`, `MACAuction`, `MACTickCharts`, `MACSymbolInfo`, `MACCapitalFlow`, `MACFileList`, `MACDownloadFullFile`, `MACMarketMonitor`, `MACSymbolBelongBoard`, `MACSymbolBars`；`MACSymbolBars` 会基于返回的流通股本字段尽力补齐 `Turnover`。
 
 ### 常用底层接口
 
 - 主行情：`GetSecurityCount`, `GetSecurityListRange`, `GetQuotesDetail`, `GetIndexInfo`, `GetIndexMomentum`, `GetVolumeProfile`, `GetMinuteTimeData`, `GetAuction`, `GetTopBoard`, `GetUnusual`, `GetTransactionData`, `GetHistoryOrders`
 - F10/文件：`GetCompanyCategories`, `GetCompanyContent`, `GetFinanceInfo`, `GetXDXRInfo`, `DownloadFile`, `GetBlockFile`
 - 扩展市场：`ExGetCategoryList`, `ExGetQuotesList`, `ExGetQuote`, `ExGetChartSampling`, `ExGetFileMeta`, `ExDownloadFile`
-- MAC：`GetMACBoardCount`, `GetMACBoardList`, `GetMACBoardMembers`, `GetMACBoardMembersQuotes`, `GetMACBoardMembersQuotesDynamic`, `GetMACSymbolQuotes`, `GetMACQuotes`, `GetMACQuotesWithDate`, `GetMACTransactions`, `GetMACTransactionsWithDate`, `GetMACAuction`, `GetMACTickCharts`, `GetMACSymbolInfo`, `GetMACCapitalFlow`, `GetMACFileList`, `GetMACFileDownload`, `GetMACMarketMonitor`, `GetMACSymbolBelongBoard`, `GetMACSymbolBars`
+- MAC：`GetMACBoardCount`, `GetMACBoardList`, `GetMACBoardMembers`, `GetMACBoardMembersQuotes`, `GetMACBoardMembersQuotesDynamic`, `GetMACBoardMembersQuotesDynamicWithFilter`, `GetMACSymbolQuotes`, `GetMACQuotes`, `GetMACQuotesWithDate`, `GetMACTransactions`, `GetMACTransactionsWithDate`, `GetMACAuction`, `GetMACTickCharts`, `GetMACSymbolInfo`, `GetMACCapitalFlow`, `GetMACFileList`, `GetMACFileDownload`, `GetMACMarketMonitor`, `GetMACSymbolBelongBoard`, `GetMACSymbolBars`
 
 ### 地址池与测速
 
@@ -328,11 +333,19 @@ http://127.0.0.1:8080
 #### MAC 协议
 
 - `NewMAC`, `NewMACEx`, `ConnectMAC`
-- `GetMACBoardCount`, `GetMACBoardList`, `GetMACBoardMembers`, `GetMACBoardMembersQuotes`, `GetMACBoardMembersQuotesDynamic`, `GetMACSymbolQuotes`, `GetMACQuotes`, `GetMACQuotesWithDate`, `GetMACTransactions`, `GetMACTransactionsWithDate`, `GetMACAuction`, `GetMACTickCharts`, `GetMACSymbolInfo`, `GetMACCapitalFlow`, `GetMACServerInfo`, `GetMACKLineOffset`, `GetMACFileList`, `GetMACFileDownload`, `GetMACMarketMonitor`
+- `GetMACBoardCount`, `GetMACBoardList`, `GetMACBoardMembers`, `GetMACBoardMembersQuotes`, `GetMACBoardMembersQuotesDynamic`, `GetMACBoardMembersQuotesDynamicWithFilter`, `GetMACSymbolQuotes`, `GetMACQuotes`, `GetMACQuotesWithDate`, `GetMACTransactions`, `GetMACTransactionsWithDate`, `GetMACAuction`, `GetMACTickCharts`, `GetMACSymbolInfo`, `GetMACCapitalFlow`, `GetMACServerInfo`, `GetMACKLineOffset`, `GetMACFileList`, `GetMACFileDownload`, `GetMACMarketMonitor`
 - `GetMACSymbolBelongBoard`, `GetMACSymbolBars`
-- `MACBoardCount`, `MACBoardList`, `MACBoardMembers`, `MACBoardMembersWithSort`, `MACBoardMembersQuotes`, `MACBoardMembersQuotesWithSort`, `MACBoardMembersQuotesDynamic`, `MACSymbolQuotes`, `MACQuotes`, `MACQuotesWithDate`, `MACTransactions`, `MACTransactionsWithDate`, `MACAuction`, `MACTickCharts`, `MACSymbolInfo`, `MACCapitalFlow`, `MACServerInfo`, `MACKLineOffset`, `MACFileList`, `MACDownloadFullFile`, `MACMarketMonitor`
+- `MACBoardCount`, `MACBoardList`, `MACBoardMembers`, `MACBoardMembersWithSort`, `MACBoardMembersQuotes`, `MACBoardMembersQuotesWithSort`, `MACBoardMembersQuotesDynamic`, `MACBoardMembersQuotesDynamicWithFilter`, `MACSymbolQuotes`, `MACQuotes`, `MACQuotesWithDate`, `MACTransactions`, `MACTransactionsWithDate`, `MACAuction`, `MACTickCharts`, `MACSymbolInfo`, `MACCapitalFlow`, `MACServerInfo`, `MACKLineOffset`, `MACFileList`, `MACDownloadFullFile`, `MACMarketMonitor`
 - `MACSymbolBelongBoard`, `MACSymbolBars`
-- 位图辅助：`MACFieldBit`, `MACPresetField`, `MACFieldBitmap`, `DefaultMACBoardMembersQuotesFieldBitmap`, `FullMACBoardMembersQuotesFieldBitmap`, `MACBoardMembersQuotesFieldBitmapFromBits`, `DefaultMACSymbolQuotesFieldBitmap`, `FullMACSymbolQuotesFieldBitmap`, `MACSymbolQuotesFieldBitmapFromBits`
+- 位图辅助：`MACFieldBit`, `MACPresetField`, `MACSortType`, `MACSortOrder`, `MACFilterType`, `MACFieldBitmap`, `MACFilterFlags`, `MACBoardMembersQuotesRequestBitmap`, `DefaultMACBoardMembersQuotesFieldBitmap`, `FullMACBoardMembersQuotesFieldBitmap`, `MACBoardMembersQuotesFieldBitmapFromBits`, `DefaultMACSymbolQuotesFieldBitmap`, `FullMACSymbolQuotesFieldBitmap`, `MACSymbolQuotesFieldBitmapFromBits`
+
+#### ICFQS HTTP
+
+- `NewICFQS`, `NewICFQSHot`, `WithICFQSAddress`, `WithICFQSTimeout`, `ICFQSHosts`, `ICFQSHostAddresses`
+- `PostTQL`, `PostJSON`, `ICFQSFormatTables`
+- `ICFQSTopicListRaw`, `ICFQSSearchTopicsRaw`, `ICFQSNewTopicsRaw`, `ICFQSHotTopicsRaw`, `ICFQSEventsRaw`, `ICFQSTopTopicsRaw`, `ICFQSTopicDetailRaw`, `ICFQSTopicKLineRaw`, `ICFQSTopicStocksRaw`
+- `ICFQSTopicQuotesRaw`, `ICFQSTopicRotationRaw`, `ICFQSQuotesBatchRaw`
+- `ICFQSLHBDetailRaw`, `ICFQSYYBDetailRaw`, `ICFQSYZDetailRaw`, `ICFQSMRFPRaw`, `ICFQSMRFPLatestDateRaw`
 
 </details>
 

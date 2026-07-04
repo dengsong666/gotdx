@@ -5,19 +5,24 @@ import (
 
 	"github.com/bensema/gotdx"
 	"github.com/bensema/gotdx/examples/internal/exampleutil"
-	"github.com/bensema/gotdx/types"
 )
 
 func main() {
 	client := exampleutil.NewMACClient()
 	defer client.Disconnect()
 
-	reply, err := client.MACBoardMembersQuotesDynamic(
+	fieldBitmap := gotdx.MACFieldBitmap(
+		gotdx.MACPresetCommon,
+		gotdx.MACFieldMainNetRatio,
+		gotdx.MACFieldChangeUpType,
+	)
+	reply, err := client.MACBoardMembersQuotesDynamicWithFilter(
 		"880761",
 		10,
-		types.SortChangePct,
-		uint8(types.SortOrderDesc),
-		gotdx.MACFieldBitmap(gotdx.MACPresetCommon),
+		uint16(gotdx.MACSortChangePct),
+		uint8(gotdx.MACSortOrderDesc),
+		fieldBitmap,
+		gotdx.MACFilterST,
 	)
 	if err != nil {
 		log.Fatalln(err)
@@ -27,13 +32,15 @@ func main() {
 		reply.Total, reply.Count, len(reply.ActiveFields), reply.FieldBitmap)
 
 	for _, item := range reply.Stocks[:min(5, len(reply.Stocks))] {
-		log.Printf("symbol=%s name=%s close=%v pre_close=%v turnover=%v pe_ttm=%v",
+		log.Printf("symbol=%s name=%s close=%v pre_close=%v turnover=%v pe_ttm=%v main_net_ratio=%v change_up_type=%v",
 			item.Symbol,
 			item.Name,
 			item.Values["close"],
 			item.Values["pre_close"],
 			item.Values["turnover"],
 			item.Values["pe_ttm"],
+			item.Values["main_net_ratio"],
+			item.Values["change_up_type"],
 		)
 	}
 }

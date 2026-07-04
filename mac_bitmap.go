@@ -39,23 +39,23 @@ const (
 	MACFieldTurnover            MACFieldBit = 0x1b
 	MACFieldIndustry            MACFieldBit = 0x1c
 	MACFieldIndustryChangeUp    MACFieldBit = 0x1d
-	MACFieldSomeBitmap          MACFieldBit = 0x1e
+	MACFieldStockTagFlags       MACFieldBit = 0x1e
 	MACFieldDecimalPoint        MACFieldBit = 0x1f
 	MACFieldBuyPriceLimit       MACFieldBit = 0x20
 	MACFieldSellPriceLimit      MACFieldBit = 0x21
 	MACFieldPriceDecimalInfo    MACFieldBit = 0x22
 	MACFieldLotSize             MACFieldBit = 0x23
-	MACFieldPreIPOV             MACFieldBit = 0x24
+	MACFieldPreIOPV             MACFieldBit = 0x24
 	MACFieldSpeedPct            MACFieldBit = 0x25
 	MACFieldAvgPrice            MACFieldBit = 0x26
-	MACFieldIPOV                MACFieldBit = 0x27
+	MACFieldIOPV                MACFieldBit = 0x27
 	MACFieldPETTMVolRelated     MACFieldBit = 0x28
 	MACFieldExPricePlaceholder  MACFieldBit = 0x29
 	MACFieldOperatingRevenue    MACFieldBit = 0x2a
 	MACFieldFlagKCB             MACFieldBit = 0x2b
 	MACFieldFlagBJ              MACFieldBit = 0x2c
 	MACFieldCirculatingCapitalZ MACFieldBit = 0x2d
-	MACFieldGEMStarInfo         MACFieldBit = 0x2e
+	MACFieldAfterHoursVolume    MACFieldBit = 0x2e
 	MACFieldPETTM               MACFieldBit = 0x30
 	MACFieldPEStatic            MACFieldBit = 0x31
 	MACFieldIndexMetric         MACFieldBit = 0x37
@@ -81,7 +81,7 @@ const (
 	MACFieldOpenAmount          MACFieldBit = 0x57
 	MACFieldAnnualLimitUpDays   MACFieldBit = 0x58
 	MACFieldActivity            MACFieldBit = 0x59
-	MACFieldDividendYieldPct    MACFieldBit = 0x5b
+	MACFieldDividendYieldRate   MACFieldBit = 0x5b
 	MACFieldConsecutiveUpDays   MACFieldBit = 0x5c
 	MACFieldLimitUpCount        MACFieldBit = 0x5d
 	MACFieldLimitDownCount      MACFieldBit = 0x5e
@@ -92,6 +92,7 @@ const (
 	MACFieldShortTurnoverPct    MACFieldBit = 0x69
 	MACFieldAmount2m            MACFieldBit = 0x6a
 	MACFieldMainNetAmountCopy   MACFieldBit = 0x6b
+	MACFieldMainNetRatio        MACFieldBit = 0x6c
 	MACFieldRetailNetAmount     MACFieldBit = 0x6d
 	MACFieldMainNet5mAmount     MACFieldBit = 0x6e
 	MACFieldMainNet3DAmount     MACFieldBit = 0x6f
@@ -105,6 +106,7 @@ const (
 	MACFieldStockFlagA          MACFieldBit = 0x77
 	MACFieldStockFlagB          MACFieldBit = 0x78
 	MACFieldAuctionVolRatio     MACFieldBit = 0x7a
+	MACFieldPrevAmount          MACFieldBit = 0x7b
 	MACFieldRecentIndicator     MACFieldBit = 0x7d
 	MACFieldBid3Price           MACFieldBit = 0x80
 	MACFieldBid4Price           MACFieldBit = 0x81
@@ -119,8 +121,23 @@ const (
 	MACFieldAsk4Volume          MACFieldBit = 0x8a
 	MACFieldDownCount           MACFieldBit = 0x8b
 	MACFieldBidAskDiff          MACFieldBit = 0x8c
-	MACFieldConstantNegOne      MACFieldBit = 0x8e
-	MACFieldStockRating         MACFieldBit = 0x8f
+	MACFieldChangeUpType        MACFieldBit = 0x8d
+	MACFieldSafetyScore         MACFieldBit = 0x8e
+	MACFieldHighlightCount      MACFieldBit = 0x8f
+	MACFieldChangeAt1000        MACFieldBit = 0x90
+	MACFieldChangeAt1030        MACFieldBit = 0x91
+	MACFieldChangeAt1100        MACFieldBit = 0x92
+	MACFieldChangeAt1130        MACFieldBit = 0x93
+	MACFieldChangeAt1330        MACFieldBit = 0x94
+	MACFieldChangeAt1400        MACFieldBit = 0x95
+	MACFieldChangeAt1430        MACFieldBit = 0x96
+	MACFieldSomeBitmap          MACFieldBit = MACFieldStockTagFlags
+	MACFieldPreIPOV             MACFieldBit = MACFieldPreIOPV
+	MACFieldIPOV                MACFieldBit = MACFieldIOPV
+	MACFieldGEMStarInfo         MACFieldBit = MACFieldAfterHoursVolume
+	MACFieldDividendYieldPct    MACFieldBit = MACFieldDividendYieldRate
+	MACFieldConstantNegOne      MACFieldBit = MACFieldSafetyScore
+	MACFieldStockRating         MACFieldBit = MACFieldHighlightCount
 	MACFieldBid2Volume          MACFieldBit = MACFieldLimitUpCount
 	MACFieldAsk2Volume          MACFieldBit = MACFieldLimitDownCount
 	MACFieldBid5Volume          MACFieldBit = MACFieldUpCount
@@ -194,7 +211,7 @@ func (preset MACPresetField) applyMACFieldBitmap(bitmap *[20]byte) {
 			bit.applyMACFieldBitmap(bitmap)
 		}
 	case MACPresetCommon:
-		for _, bit := range []MACFieldBit{MACFieldPreClose, MACFieldOpen, MACFieldHigh, MACFieldLow, MACFieldClose, MACFieldVol, MACFieldVolRatio, MACFieldAmount, MACFieldTotalShares, MACFieldFloatShares, MACFieldEPS, MACFieldNetAssets, MACFieldSecurityTypePrice, MACFieldTotalMarketCapAb, MACFieldPEDynamic, MACFieldLotSizeInfo, MACFieldDividendYield, MACFieldLastVolume, MACFieldTurnover, MACFieldSomeBitmap, MACFieldDecimalPoint, MACFieldBuyPriceLimit, MACFieldSellPriceLimit, MACFieldPriceDecimalInfo, MACFieldLotSize, MACFieldPreIPOV, MACFieldSpeedPct, MACFieldFlagKCB, MACFieldPETTM, MACFieldPEStatic, MACFieldMainNetAmount, MACFieldVolSpeedPct, MACFieldShortTurnoverPct, MACFieldCirculatingCapitalZ} {
+		for _, bit := range []MACFieldBit{MACFieldPreClose, MACFieldOpen, MACFieldHigh, MACFieldLow, MACFieldClose, MACFieldVol, MACFieldVolRatio, MACFieldAmount, MACFieldTotalShares, MACFieldFloatShares, MACFieldEPS, MACFieldNetAssets, MACFieldSecurityTypePrice, MACFieldTotalMarketCapAb, MACFieldPEDynamic, MACFieldLotSizeInfo, MACFieldDividendYield, MACFieldLastVolume, MACFieldTurnover, MACFieldStockTagFlags, MACFieldDecimalPoint, MACFieldBuyPriceLimit, MACFieldSellPriceLimit, MACFieldPriceDecimalInfo, MACFieldLotSize, MACFieldPreIOPV, MACFieldSpeedPct, MACFieldFlagKCB, MACFieldPETTM, MACFieldPEStatic, MACFieldMainNetAmount, MACFieldVolSpeedPct, MACFieldShortTurnoverPct, MACFieldCirculatingCapitalZ} {
 			bit.applyMACFieldBitmap(bitmap)
 		}
 	case MACPresetDebug:
@@ -202,7 +219,7 @@ func (preset MACPresetField) applyMACFieldBitmap(bitmap *[20]byte) {
 			bitmap[i] = 0xff
 		}
 	case MACPresetAll:
-		for _, bit := range []MACFieldBit{MACFieldPreClose, MACFieldOpen, MACFieldHigh, MACFieldLow, MACFieldClose, MACFieldVol, MACFieldVolRatio, MACFieldAmount, MACFieldInsideVolume, MACFieldOutsideVolume, MACFieldTotalShares, MACFieldFloatShares, MACFieldEPS, MACFieldNetAssets, MACFieldSecurityTypePrice, MACFieldTotalMarketCapAb, MACFieldPEDynamic, MACFieldBidPrice, MACFieldAskPrice, MACFieldServerUpdateDate, MACFieldServerUpdateTime, MACFieldLotSizeInfo, MACFieldBoardStrength, MACFieldDividendYield, MACFieldBidVolume, MACFieldAskVolume, MACFieldLastVolume, MACFieldTurnover, MACFieldIndustry, MACFieldIndustryChangeUp, MACFieldSomeBitmap, MACFieldDecimalPoint, MACFieldBuyPriceLimit, MACFieldSellPriceLimit, MACFieldPriceDecimalInfo, MACFieldLotSize, MACFieldPreIPOV, MACFieldSpeedPct, MACFieldAvgPrice, MACFieldIPOV, MACFieldPETTMVolRelated, MACFieldExPricePlaceholder, MACFieldOperatingRevenue, MACFieldFlagKCB, MACFieldFlagBJ, MACFieldCirculatingCapitalZ, MACFieldGEMStarInfo, MACFieldPETTM, MACFieldPEStatic, MACFieldIndexMetric, MACFieldMainNetAmount, MACFieldBidAskRatio, MACFieldNonIndexFlag, MACFieldChange20DPct, MACFieldYTDPct, MACFieldStockClassCode, MACFieldPercentBase, MACFieldMTDPct, MACFieldChange1yPct, MACFieldPrevChangePct, MACFieldChange3DPct, MACFieldChange60DPct, MACFieldChange5DPct, MACFieldChange10DPct, MACFieldPrev2ChangePct, MACFieldBid2Price, MACFieldAsk2Price, MACFieldAHCode, MACFieldUnknownCode, MACFieldOpenAmount, MACFieldAnnualLimitUpDays, MACFieldActivity, MACFieldDividendYieldPct, MACFieldConsecutiveUpDays, MACFieldLimitUpCount, MACFieldLimitDownCount, MACFieldIndustrySub, MACFieldAuctionBuyLimit, MACFieldAuctionSellLimit, MACFieldVolSpeedPct, MACFieldShortTurnoverPct, MACFieldAmount2m, MACFieldMainNetAmountCopy, MACFieldRetailNetAmount, MACFieldMainNet5mAmount, MACFieldMainNet3DAmount, MACFieldMainNet5DAmount, MACFieldMainNet10DAmount, MACFieldMainBuyNetAmount, MACFieldDDX, MACFieldDDY, MACFieldDDZ, MACFieldDDF, MACFieldStockFlagA, MACFieldStockFlagB, MACFieldAuctionVolRatio, MACFieldRecentIndicator, MACFieldBid3Price, MACFieldBid4Price, MACFieldBid5Price, MACFieldAsk3Price, MACFieldAsk4Price, MACFieldAsk5Price, MACFieldBid3Volume, MACFieldBid4Volume, MACFieldUpCount, MACFieldAsk3Volume, MACFieldAsk4Volume, MACFieldDownCount, MACFieldBidAskDiff, MACFieldConstantNegOne, MACFieldStockRating} {
+		for _, bit := range []MACFieldBit{MACFieldPreClose, MACFieldOpen, MACFieldHigh, MACFieldLow, MACFieldClose, MACFieldVol, MACFieldVolRatio, MACFieldAmount, MACFieldInsideVolume, MACFieldOutsideVolume, MACFieldTotalShares, MACFieldFloatShares, MACFieldEPS, MACFieldNetAssets, MACFieldSecurityTypePrice, MACFieldTotalMarketCapAb, MACFieldPEDynamic, MACFieldBidPrice, MACFieldAskPrice, MACFieldServerUpdateDate, MACFieldServerUpdateTime, MACFieldLotSizeInfo, MACFieldBoardStrength, MACFieldDividendYield, MACFieldBidVolume, MACFieldAskVolume, MACFieldLastVolume, MACFieldTurnover, MACFieldIndustry, MACFieldIndustryChangeUp, MACFieldStockTagFlags, MACFieldDecimalPoint, MACFieldBuyPriceLimit, MACFieldSellPriceLimit, MACFieldPriceDecimalInfo, MACFieldLotSize, MACFieldPreIOPV, MACFieldSpeedPct, MACFieldAvgPrice, MACFieldIOPV, MACFieldPETTMVolRelated, MACFieldExPricePlaceholder, MACFieldOperatingRevenue, MACFieldFlagKCB, MACFieldFlagBJ, MACFieldCirculatingCapitalZ, MACFieldAfterHoursVolume, MACFieldPETTM, MACFieldPEStatic, MACFieldIndexMetric, MACFieldMainNetAmount, MACFieldBidAskRatio, MACFieldNonIndexFlag, MACFieldChange20DPct, MACFieldYTDPct, MACFieldStockClassCode, MACFieldPercentBase, MACFieldMTDPct, MACFieldChange1yPct, MACFieldPrevChangePct, MACFieldChange3DPct, MACFieldChange60DPct, MACFieldChange5DPct, MACFieldChange10DPct, MACFieldPrev2ChangePct, MACFieldBid2Price, MACFieldAsk2Price, MACFieldAHCode, MACFieldUnknownCode, MACFieldOpenAmount, MACFieldAnnualLimitUpDays, MACFieldActivity, MACFieldDividendYieldRate, MACFieldConsecutiveUpDays, MACFieldLimitUpCount, MACFieldLimitDownCount, MACFieldIndustrySub, MACFieldAuctionBuyLimit, MACFieldAuctionSellLimit, MACFieldVolSpeedPct, MACFieldShortTurnoverPct, MACFieldAmount2m, MACFieldMainNetAmountCopy, MACFieldMainNetRatio, MACFieldRetailNetAmount, MACFieldMainNet5mAmount, MACFieldMainNet3DAmount, MACFieldMainNet5DAmount, MACFieldMainNet10DAmount, MACFieldMainBuyNetAmount, MACFieldDDX, MACFieldDDY, MACFieldDDZ, MACFieldDDF, MACFieldStockFlagA, MACFieldStockFlagB, MACFieldAuctionVolRatio, MACFieldPrevAmount, MACFieldRecentIndicator, MACFieldBid3Price, MACFieldBid4Price, MACFieldBid5Price, MACFieldAsk3Price, MACFieldAsk4Price, MACFieldAsk5Price, MACFieldBid3Volume, MACFieldBid4Volume, MACFieldUpCount, MACFieldAsk3Volume, MACFieldAsk4Volume, MACFieldDownCount, MACFieldBidAskDiff, MACFieldChangeUpType, MACFieldSafetyScore, MACFieldHighlightCount, MACFieldChangeAt1000, MACFieldChangeAt1030, MACFieldChangeAt1100, MACFieldChangeAt1130, MACFieldChangeAt1330, MACFieldChangeAt1400, MACFieldChangeAt1430} {
 			bit.applyMACFieldBitmap(bitmap)
 		}
 	}

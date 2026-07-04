@@ -4101,7 +4101,7 @@ func rowsFromSecurityBars(items []proto.SecurityBar) [][]string {
 	for _, item := range items {
 		rows = append(rows, []string{
 			item.DateTime.Format(time.DateTime),
-			formatFloat(item.Last),
+			formatFloat(item.PreClose),
 			formatFloat(item.Open),
 			formatFloat(item.High),
 			formatFloat(item.Low),
@@ -4511,7 +4511,7 @@ func rowsFromExKLine(items []proto.ExKLineItem) [][]string {
 	for _, item := range items {
 		rows = append(rows, []string{
 			item.DateTime.Format(time.DateTime),
-			formatFloat(item.Last),
+			formatFloat(item.PreClose),
 			formatFloat(item.Open),
 			formatFloat(item.High),
 			formatFloat(item.Low),

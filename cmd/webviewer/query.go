@@ -2641,7 +2641,7 @@ func runMethod(def methodDef, params map[string]string) (queryPayload, map[strin
 				return queryPayload{}, err
 			}
 			return queryPayload{
-				columns: []string{"datetime", "open", "high", "low", "close", "vol", "amount"},
+				columns: []string{"datetime", "last", "open", "high", "low", "close", "vol", "amount"},
 				rows:    rowsFromExKLine(reply.List),
 				raw:     reply.List,
 			}, nil
@@ -4101,7 +4101,7 @@ func rowsFromSecurityBars(items []proto.SecurityBar) [][]string {
 	for _, item := range items {
 		rows = append(rows, []string{
 			item.DateTime.Format(time.DateTime),
-			formatFloat(item.Last),
+			formatFloat(item.PreClose),
 			formatFloat(item.Open),
 			formatFloat(item.High),
 			formatFloat(item.Low),
@@ -4510,7 +4510,8 @@ func rowsFromExKLine(items []proto.ExKLineItem) [][]string {
 	rows := make([][]string, 0, len(items))
 	for _, item := range items {
 		rows = append(rows, []string{
-			item.DateTime,
+			item.DateTime.Format(time.DateTime),
+			formatFloat(item.PreClose),
 			formatFloat(item.Open),
 			formatFloat(item.High),
 			formatFloat(item.Low),

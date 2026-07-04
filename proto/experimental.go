@@ -591,7 +591,7 @@ func (obj *ExGetKLine2) ParseResponse(header *RespHeader, data []byte) error {
 			return fmt.Errorf("invalid ex kline2 datetime: %d", dateNum)
 		}
 		item := ExKLineItem{
-			DateTime: ts.Format("2006-01-02 15:04:05"),
+			DateTime: ts,
 			Open:     float64(math.Float32frombits(binary.LittleEndian.Uint32(data[pos+4 : pos+8]))),
 			High:     float64(math.Float32frombits(binary.LittleEndian.Uint32(data[pos+8 : pos+12]))),
 			Low:      float64(math.Float32frombits(binary.LittleEndian.Uint32(data[pos+12 : pos+16]))),

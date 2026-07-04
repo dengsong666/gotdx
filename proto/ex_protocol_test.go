@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"math"
 	"testing"
+	"time"
 )
 
 func readExReqHeader(t *testing.T, raw []byte) exReqHeader {
@@ -443,7 +444,7 @@ func TestExGetKLineBuildRequestAndParseResponse(t *testing.T) {
 	if reply.Count != 1 || len(reply.List) != 1 {
 		t.Fatalf("unexpected reply: %+v", reply)
 	}
-	if reply.List[0].DateTime[:10] != "2026-03-31" || reply.List[0].Vol != 8888 {
+	if reply.List[0].DateTime.Format(time.DateOnly) != "2026-03-31" || reply.List[0].Vol != 8888 {
 		t.Fatalf("unexpected kline item: %+v", reply.List[0])
 	}
 }

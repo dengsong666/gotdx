@@ -1,0 +1,44 @@
+name: Notify Stock Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Notify web deployment workflow
+        env:
+          TOKEN: ${{ secrets.STOCK_DEPLOY_DISPATCH_TOKEN }}
+          COMMIT: ${{ github.sha }}
+          REF: ${{ github.ref_name }}
+        run: |
+          test -n "$TOKEN" || {
+            echo "::error::Missing STOCK_DEPLOY_DISPATCH_TOKEN"
+            exit 1
+          }
+
+          curl --fail-with-body --request POST \
+            --url https://api.github.com/repos/dengsong666/stock-web/dispatches \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer ${TOKEN}" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            --data "$(cat <<JSON
+          {
+            "event_type": "stock-deploy",
+            "client_payload": {
+              "source_repository": "stock-tdx",
+              "source_ref": "${REF}",
+              "source_sha": "${COMMIT}",
+              "web_ref": "main",
+              "model_ref": "main",
+              "adata_ref": "main",
+              "tdx_ref": "${COMMIT}"
+            }
+          }
+          JSON
+          )"

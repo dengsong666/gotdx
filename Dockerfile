@@ -1,3 +1,4 @@
+
 FROM golang:1.26-bookworm AS builder
 
 ARG GOPROXY=https://goproxy.cn,direct
@@ -18,7 +19,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 FROM alpine:3.22
 
-ENV GOTDX_WEB_ADDR=0.0.0.0:8181 \
+ENV GOTDX_WEB_ADDR=0.0.0.0:8883 \
     TZ=Asia/Shanghai
 
 WORKDIR /app
@@ -27,9 +28,9 @@ RUN apk add --no-cache ca-certificates tzdata wget
 
 COPY --from=builder /out/gotdx-webviewer /app/gotdx-webviewer
 
-EXPOSE 8181
+EXPOSE 8883
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget -qO- http://127.0.0.1:8181/api/methods >/dev/null || exit 1
+    CMD wget -qO- http://127.0.0.1:8883/api/methods >/dev/null || exit 1
 
 CMD ["/app/gotdx-webviewer"]

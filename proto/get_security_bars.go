@@ -31,7 +31,8 @@ type GetSecurityBarsReply struct {
 }
 
 type SecurityBar struct {
-	Last      float64   // 昨收盘价
+	PreClose  float64   // 昨收价
+	LastClose float64   // 前收价
 	Open      float64   // 开盘价。
 	Close     float64   // 收盘价。
 	High      float64   // 最高价。
@@ -99,7 +100,7 @@ func (obj *GetSecurityBars) ParseResponse(header *RespHeader, data []byte) error
 	}
 	pos += 2
 
-	var lastRaw int // 昨收盘价
+	var preCloseRaw int // 昨收盘价
 	for index := uint16(0); index < obj.reply.Count; index++ {
 		var dateNum uint32
 		if err := binary.Read(bytes.NewBuffer(data[pos:pos+4]), binary.LittleEndian, &dateNum); err != nil {
@@ -116,7 +117,7 @@ func (obj *GetSecurityBars) ParseResponse(header *RespHeader, data []byte) error
 
 		openRaw = getprice(data, &pos)
 		if isOffsetReq {
-			openRaw = lastRaw + openRaw
+			openRaw = preCloseRaw + openRaw
 			closeRaw = getprice(data, &pos) + openRaw
 			highRaw = getprice(data, &pos) + openRaw
 			lowRaw = getprice(data, &pos) + openRaw
@@ -143,8 +144,9 @@ func (obj *GetSecurityBars) ParseResponse(header *RespHeader, data []byte) error
 			Minute:   dateTime.Minute(),
 			DateTime: dateTime,
 		}
-		bar.Last = float64(lastRaw) / 1000.0
-		lastRaw = closeRaw
+		bar.PreClose = float64(preCloseRaw) / 1000.0
+		bar.LastClose = float64(preCloseRaw) / 1000.0
+		preCloseRaw = closeRaw
 
 		bar.RiseRate = bar.GetRiseRate()
 		bar.RisePrice = bar.GetRisePrice()
@@ -169,19 +171,19 @@ func (obj *GetSecurityBars) ParseResponse(header *RespHeader, data []byte) error
 }
 
 func (bar SecurityBar) GetRisePrice() float64 {
-	if bar.Last == 0 {
+	if bar.PreClose == 0 {
 		//稍微数据准确点，没减去0这么夸张，还是不准的
 		return bar.Close - bar.Open
 	}
-	return bar.Close - bar.Last
+	return bar.Close - bar.PreClose
 }
 
 // RiseRate 涨跌比例/涨跌幅
 func (bar SecurityBar) GetRiseRate() float64 {
-	if bar.Last == 0 {
+	if bar.PreClose == 0 {
 		return float64(bar.Close-bar.Open) / float64(bar.Open) * 100
 	}
-	return float64(bar.Close-bar.Last) / float64(bar.Last) * 100
+	return float64(bar.Close-bar.PreClose) / float64(bar.PreClose) * 100
 }
 
 func (obj *GetSecurityBars) Response() *GetSecurityBarsReply {

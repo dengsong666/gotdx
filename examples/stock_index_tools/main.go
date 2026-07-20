@@ -12,20 +12,20 @@ func main() {
 	client := exampleutil.NewMainClient()
 	defer client.Disconnect()
 
-	info, err := client.StockIndexInfo(types.MarketSZ.Uint8(), "399001")
+	info, err := client.StockIndexInfo(types.MarketSH.Uint8(), "000001")
 	if err != nil {
 		log.Fatalln(err)
 	}
 	log.Printf("index_info code=%s time=%s close=%.2f open=%.2f high=%.2f low=%.2f up=%d down=%d",
 		info.Code, info.ServerTime, info.Close, info.Open, info.High, info.Low, info.UpCount, info.DownCount)
 
-	momentum, err := client.StockIndexMomentum(types.MarketSZ.Uint8(), "399001")
+	momentum, err := client.StockIndexMomentum(types.MarketSH.Uint8(), "000001")
 	if err != nil {
 		log.Fatalln(err)
 	}
 	log.Printf("index_momentum count=%d last=%d", len(momentum), momentum[len(momentum)-1])
 
-	bars, err := client.GetIndexBars(types.KLINE_TYPE_DAILY, types.MarketSZ.Uint8(), "399001", 0, 5)
+	bars, err := client.GetIndexBars(types.KLINE_TYPE_DAILY, types.MarketSH.Uint8(), "000001", 0, 5)
 	if err != nil {
 		log.Fatalln(err)
 	}

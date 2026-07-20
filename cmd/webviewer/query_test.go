@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bensema/gotdx"
 	"github.com/bensema/gotdx/proto"
 )
 
@@ -83,6 +84,17 @@ func TestMethodDefsIncludeNewComparisonMethods(t *testing.T) {
 		"mac_kline_offset",
 		"mac_ex_board_count",
 		"mac_ex_quotes",
+		"icfqs_topic_list_raw",
+		"icfqs_topic_search_raw",
+		"icfqs_topic_stocks_raw",
+		"icfqs_topic_quotes_raw",
+		"icfqs_topic_rotation_raw",
+		"icfqs_quotes_batch_raw",
+		"icfqs_lhb_detail_raw",
+		"icfqs_yyb_detail_raw",
+		"icfqs_yz_detail_raw",
+		"icfqs_mrfp_latest_date_raw",
+		"icfqs_mrfp_raw",
 		"goods_count",
 		"goods_varieties",
 		"goods_quotes",
@@ -294,6 +306,77 @@ func TestRowsFromMACDynamicFieldDefs(t *testing.T) {
 	}
 	if rows[0][0] != "37" || rows[0][1] != "speed_pct" || rows[0][3] != "涨速" {
 		t.Fatalf("unexpected field row values: %#v", rows[0])
+	}
+}
+
+func TestRowsFromICFQSResponses(t *testing.T) {
+	tableRaw := map[string]any{
+		"ResultSets": []any{
+			map[string]any{
+				"ColName": []any{"code", "name"},
+				"Content": []any{
+					[]any{"000001", "PINGAN"},
+				},
+			},
+			map[string]any{
+				"ColName": []any{"topic", "pct"},
+				"Content": []any{
+					[]any{"AI", "3.21"},
+				},
+			},
+		},
+	}
+	columns, rows := rowsFromICFQSTables(tableRaw)
+	if len(columns) != 2 || len(rows) != 1 || rows[0][0] != "000001" || rows[0][1] != "PINGAN" {
+		t.Fatalf("unexpected icfqs table rows: columns=%#v rows=%#v", columns, rows)
+	}
+	columns, rows = rowsFromICFQSTable(tableRaw, 1)
+	if len(columns) != 2 || columns[0] != "topic" || len(rows) != 1 || rows[0][0] != "AI" || rows[0][1] != "3.21" {
+		t.Fatalf("unexpected icfqs indexed table rows: columns=%#v rows=%#v", columns, rows)
+	}
+
+	listRaw := map[string]any{
+		"ListHead": map[string]any{"ItemHead": []any{"Code", "NOW"}},
+		"ListItem": []any{
+			map[string]any{"Item": []any{"000001", "12.34"}},
+		},
+	}
+	columns, rows = rowsFromICFQSListItems(listRaw)
+	if len(columns) != 2 || columns[1] != "NOW" || rows[0][1] != "12.34" {
+		t.Fatalf("unexpected icfqs list rows: columns=%#v rows=%#v", columns, rows)
+	}
+}
+
+func TestParseICFQSParams(t *testing.T) {
+	tableIndex, err := parseICFQSTableIndex(map[string]string{"table_index": "2"}, 0)
+	if err != nil {
+		t.Fatalf("parse table index failed: %v", err)
+	}
+	if tableIndex != 2 {
+		t.Fatalf("unexpected table index: %d", tableIndex)
+	}
+
+	codes, err := parseICFQSCodeParams(map[string]string{
+		"setcodes": "2",
+		"codes":    "308742,308743",
+	}, "", "")
+	if err != nil {
+		t.Fatalf("parse icfqs codes failed: %v", err)
+	}
+	expected := []gotdx.ICFQSCode{
+		{Setcode: "2", Code: "308742"},
+		{Setcode: "2", Code: "308743"},
+	}
+	if len(codes) != len(expected) || codes[1] != expected[1] {
+		t.Fatalf("unexpected icfqs codes: %#v", codes)
+	}
+
+	_, err = parseICFQSCodeParams(map[string]string{
+		"setcodes": "0,1",
+		"codes":    "000001",
+	}, "", "")
+	if err == nil {
+		t.Fatal("expected setcodes/codes count error")
 	}
 }
 

@@ -77,31 +77,31 @@ var macBoardMembersQuotesDynamicFieldMap = map[uint8]MACDynamicFieldDef{
 	0x13: {Bit: 0x13, Name: "server_update_date", Format: "uint32", Description: "服务器更新日期 YYYYMMDD"},
 	0x14: {Bit: 0x14, Name: "server_update_time", Format: "uint32", Description: "服务器更新时间 HHMMSS"},
 	0x15: {Bit: 0x15, Name: "lot_size_info", Format: "uint32", Description: "未确定"},
-	0x16: {Bit: 0x16, Name: "board_strength", Format: "float32", Description: "板块强度(涨跌家数差)", Aliases: []string{"unknown_22"}},
-	0x17: {Bit: 0x17, Name: "dividend_yield", Format: "float32", Description: "股息(含义待定)"},
+	0x16: {Bit: 0x16, Name: "board_strength", Format: "int32", Description: "板块强度(涨跌家数差)", Aliases: []string{"unknown_22"}},
+	0x17: {Bit: 0x17, Name: "dividend_yield", Format: "float32", Description: "每股股息(元)"},
 	0x18: {Bit: 0x18, Name: "bid_volume", Format: "uint32", Description: "买量"},
 	0x19: {Bit: 0x19, Name: "ask_volume", Format: "uint32", Description: "卖量"},
 	0x1a: {Bit: 0x1a, Name: "last_volume", Format: "uint32", Description: "现量"},
 	0x1b: {Bit: 0x1b, Name: "turnover", Format: "float32", Description: "换手"},
 	0x1c: {Bit: 0x1c, Name: "industry", Format: "uint32", Description: "行业分类代码", Aliases: []string{"block5"}},
 	0x1d: {Bit: 0x1d, Name: "industry_change_up", Format: "float32", Description: "行业涨跌幅", Aliases: []string{"block_ext_info"}},
-	0x1e: {Bit: 0x1e, Name: "some_bitmap", Format: "uint32", Description: "位图"},
+	0x1e: {Bit: 0x1e, Name: "stock_tag_flags", Format: "uint32", Description: "股票标签位图", Aliases: []string{"some_bitmap"}},
 	0x1f: {Bit: 0x1f, Name: "decimal_point", Format: "uint32", Description: "数据精度"},
 	0x20: {Bit: 0x20, Name: "buy_price_limit", Format: "float32", Description: "涨停价"},
 	0x21: {Bit: 0x21, Name: "sell_price_limit", Format: "float32", Description: "跌停价"},
 	0x22: {Bit: 0x22, Name: "price_decimal_info", Format: "uint32", Description: "价格精度标志", Aliases: []string{"unknown_34"}},
 	0x23: {Bit: 0x23, Name: "lot_size", Format: "uint32", Description: "所属地区板块(A股)/每手股数(港股)"},
-	0x24: {Bit: 0x24, Name: "pre_ipov", Format: "float32", Description: "昨IPOV", Aliases: []string{"float_shares"}},
+	0x24: {Bit: 0x24, Name: "pre_iopv", Format: "float32", Description: "昨IOPV", Aliases: []string{"pre_ipov", "float_shares"}},
 	0x25: {Bit: 0x25, Name: "speed_pct", Format: "float32", Description: "涨速"},
 	0x26: {Bit: 0x26, Name: "avg_price", Format: "float32", Description: "均价"},
-	0x27: {Bit: 0x27, Name: "ipov", Format: "float32", Description: "IPOV", Aliases: []string{"float_shares2"}},
+	0x27: {Bit: 0x27, Name: "iopv", Format: "float32", Description: "IOPV", Aliases: []string{"ipov", "float_shares2"}},
 	0x28: {Bit: 0x28, Name: "pe_ttm_vol_related", Format: "float32", Description: "前参考价(美股适用)"},
 	0x29: {Bit: 0x29, Name: "ex_price_placeholder", Format: "float32", Description: "前金额参考", Aliases: []string{"close_placeholder"}},
 	0x2a: {Bit: 0x2a, Name: "operating_revenue", Format: "float32", Description: "营业收入(万)", Aliases: []string{"unknown_42"}},
 	0x2b: {Bit: 0x2b, Name: "flag_kcb", Format: "uint32", Description: "科创板标志", Aliases: []string{"kcb_flag"}},
 	0x2c: {Bit: 0x2c, Name: "flag_bj", Format: "uint32", Description: "北交所标志", Aliases: []string{"bj_flag"}},
 	0x2d: {Bit: 0x2d, Name: "circulating_capital_z", Format: "float32", Description: "流通股本Z（单位：万股）", Aliases: []string{"unknown_45"}},
-	0x2e: {Bit: 0x2e, Name: "gem_star_info", Format: "float32", Description: "创业板/科创板数据", Aliases: []string{"unknown_46"}},
+	0x2e: {Bit: 0x2e, Name: "after_hours_volume", Format: "int32", Description: "盘后量", Aliases: []string{"gem_star_info", "unknown_46"}},
 	0x2f: {Bit: 0x2f, Name: "unknown_47", Format: "float32", Description: "未知字段 47"},
 	0x30: {Bit: 0x30, Name: "pe_ttm", Format: "float32", Description: "市盈率TTM"},
 	0x31: {Bit: 0x31, Name: "pe_static", Format: "float32", Description: "市盈率静"},
@@ -145,7 +145,7 @@ var macBoardMembersQuotesDynamicFieldMap = map[uint8]MACDynamicFieldDef{
 	0x57: {Bit: 0x57, Name: "open_amount", Format: "float32", Description: "开盘金额(元)"},
 	0x58: {Bit: 0x58, Name: "annual_limit_up_days", Format: "int32", Description: "年涨停天数"},
 	0x59: {Bit: 0x59, Name: "activity", Format: "uint32", Description: "活跃度"},
-	0x5b: {Bit: 0x5b, Name: "dividend_yield_pct", Format: "float32", Description: "股息率(%)"},
+	0x5b: {Bit: 0x5b, Name: "dividend_yield_rate", Format: "float32", Description: "股息率%", Aliases: []string{"dividend_yield_pct"}},
 	0x5c: {Bit: 0x5c, Name: "consecutive_up_days", Format: "int32", Description: "连涨天"},
 	0x5d: {Bit: 0x5d, Name: "limit_up_count", Format: "uint32", Description: "涨停数(板块) / 买二量(个股)", Aliases: []string{"bid2_volume"}},
 	0x5e: {Bit: 0x5e, Name: "limit_down_count", Format: "uint32", Description: "跌停数(板块) / 卖二量(个股)", Aliases: []string{"ask2_volume"}},
@@ -156,6 +156,7 @@ var macBoardMembersQuotesDynamicFieldMap = map[uint8]MACDynamicFieldDef{
 	0x69: {Bit: 0x69, Name: "short_turnover_pct", Format: "float32", Description: "短换手%"},
 	0x6a: {Bit: 0x6a, Name: "amount_2m", Format: "float32", Description: "2分钟金额(元)"},
 	0x6b: {Bit: 0x6b, Name: "main_net_amount_copy", Format: "float32", Description: "今日主力净流入(副本)"},
+	0x6c: {Bit: 0x6c, Name: "main_net_ratio", Format: "float32", Description: "主力净比%"},
 	0x6d: {Bit: 0x6d, Name: "retail_net_amount", Format: "float32", Description: "散户单增比"},
 	0x6e: {Bit: 0x6e, Name: "main_net_5m_amount", Format: "float32", Description: "5分钟主力净额"},
 	0x6f: {Bit: 0x6f, Name: "main_net_3d_amount", Format: "float32", Description: "近三日主力净额"},
@@ -169,6 +170,7 @@ var macBoardMembersQuotesDynamicFieldMap = map[uint8]MACDynamicFieldDef{
 	0x77: {Bit: 0x77, Name: "stock_flag_a", Format: "float32", Description: "个股标志位A"},
 	0x78: {Bit: 0x78, Name: "stock_flag_b", Format: "float32", Description: "个股标志位B(副本)"},
 	0x7a: {Bit: 0x7a, Name: "auction_vol_ratio", Format: "float32", Description: "竞价昨比"},
+	0x7b: {Bit: 0x7b, Name: "prev_amount", Format: "float32", Description: "昨成交额(元)"},
 	0x7d: {Bit: 0x7d, Name: "recent_indicator", Format: "float32", Description: "近日指标提示"},
 	0x80: {Bit: 0x80, Name: "bid3_price", Format: "float32", Description: "买三价"},
 	0x81: {Bit: 0x81, Name: "bid4_price", Format: "float32", Description: "买四价"},
@@ -183,8 +185,16 @@ var macBoardMembersQuotesDynamicFieldMap = map[uint8]MACDynamicFieldDef{
 	0x8a: {Bit: 0x8a, Name: "ask4_volume", Format: "uint32", Description: "卖四量"},
 	0x8b: {Bit: 0x8b, Name: "down_count", Format: "uint32", Description: "下跌家数(板块) / 卖五量(个股)", Aliases: []string{"ask5_volume"}},
 	0x8c: {Bit: 0x8c, Name: "bid_ask_diff", Format: "int32", Description: "委差"},
-	0x8e: {Bit: 0x8e, Name: "constant_neg_one", Format: "int32", Description: "填充位(A股非-1)"},
-	0x8f: {Bit: 0x8f, Name: "stock_rating", Format: "float32", Description: "个股评级代码"},
+	0x8d: {Bit: 0x8d, Name: "change_up_type", Format: "int32", Description: "封板状态"},
+	0x8e: {Bit: 0x8e, Name: "safety_score", Format: "float32", Description: "安全分", Aliases: []string{"constant_neg_one"}},
+	0x8f: {Bit: 0x8f, Name: "highlight_count", Format: "float32", Description: "亮点数", Aliases: []string{"stock_rating"}},
+	0x90: {Bit: 0x90, Name: "change_at_1000", Format: "float32", Description: "日内涨幅% 10:00"},
+	0x91: {Bit: 0x91, Name: "change_at_1030", Format: "float32", Description: "日内涨幅% 10:30"},
+	0x92: {Bit: 0x92, Name: "change_at_1100", Format: "float32", Description: "日内涨幅% 11:00"},
+	0x93: {Bit: 0x93, Name: "change_at_1130", Format: "float32", Description: "日内涨幅% 11:30"},
+	0x94: {Bit: 0x94, Name: "change_at_1330", Format: "float32", Description: "日内涨幅% 13:30"},
+	0x95: {Bit: 0x95, Name: "change_at_1400", Format: "float32", Description: "日内涨幅% 14:00"},
+	0x96: {Bit: 0x96, Name: "change_at_1430", Format: "float32", Description: "日内涨幅% 14:30"},
 }
 
 func defaultMACBoardMembersQuotesFieldBitmap() [20]byte {
@@ -246,19 +256,19 @@ func (obj *MACBoardMembersQuotesDynamic) BuildRequest() ([]byte, error) {
 	if err := binary.Write(payload, binary.LittleEndian, obj.request.Start); err != nil {
 		return nil, err
 	}
-	if err := binary.Write(payload, binary.LittleEndian, obj.request.PageSize); err != nil {
-		return nil, err
-	}
-	if err := binary.Write(payload, binary.LittleEndian, obj.request.Zero); err != nil {
+	if err := binary.Write(payload, binary.LittleEndian, uint16(obj.request.PageSize)); err != nil {
 		return nil, err
 	}
 	if err := binary.Write(payload, binary.LittleEndian, obj.request.SortOrder); err != nil {
 		return nil, err
 	}
-	if err := binary.Write(payload, binary.LittleEndian, obj.request.Filter); err != nil {
+	if err := binary.Write(payload, binary.LittleEndian, obj.request.Zero); err != nil {
 		return nil, err
 	}
-	if _, err := payload.Write(obj.request.FieldBitmap[:]); err != nil {
+	fieldBitmap := obj.request.FieldBitmap
+	fieldBitmap[17] = obj.request.Filter
+	fieldBitmap[19] |= 1
+	if _, err := payload.Write(fieldBitmap[:]); err != nil {
 		return nil, err
 	}
 	return buildExRequest(KMSG_MACBOARDMEMBERS, payload.Bytes())

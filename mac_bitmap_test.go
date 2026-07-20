@@ -36,4 +36,28 @@ func TestMACFieldAliases(t *testing.T) {
 	if MACFieldAsk5Volume != MACFieldDownCount {
 		t.Fatal("ask5 volume alias should match down count")
 	}
+	if MACFieldPreIPOV != MACFieldPreIOPV {
+		t.Fatal("legacy pre IPOV alias should match pre IOPV")
+	}
+	if MACFieldConstantNegOne != MACFieldSafetyScore {
+		t.Fatal("legacy safety-score alias should match latest field")
+	}
+}
+
+func TestMACBoardMembersQuotesRequestBitmap(t *testing.T) {
+	bitmap := MACFieldBitmap(MACFieldMainNetRatio, MACFieldChangeAt1000)
+	requestBitmap := MACBoardMembersQuotesRequestBitmap(bitmap, MACFilterKCB, MACFilterST, MACFilterBJ)
+
+	if requestBitmap[0x6c/8]&(1<<(0x6c%8)) == 0 {
+		t.Fatalf("main net ratio bit missing: %x", requestBitmap)
+	}
+	if requestBitmap[0x90/8]&(1<<(0x90%8)) == 0 {
+		t.Fatalf("change-at-1000 bit missing: %x", requestBitmap)
+	}
+	if requestBitmap[17] != MACFilterFlags(MACFilterKCB, MACFilterST, MACFilterBJ) {
+		t.Fatalf("unexpected filter byte: %#x", requestBitmap[17])
+	}
+	if requestBitmap[19]&1 == 0 {
+		t.Fatalf("extended control bit missing: %#x", requestBitmap[19])
+	}
 }

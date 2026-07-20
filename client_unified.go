@@ -162,11 +162,11 @@ func (client *Client) StockKLine930(category uint16, market uint8, code string, 
 							data.High = trans[0].Price
 							data.Low = trans[0].Price
 							data.Close = trans[0].Price
-							data.Last = v.Last
+							data.PreClose = v.PreClose
 							data.Vol = cast.ToFloat64(trans[0].Vol)
 							data.Amount = cast.ToFloat64(trans[0].Vol) * trans[0].Price * 100
 							data.DateTime = time.Date(v.DateTime.Year(), v.DateTime.Month(), v.DateTime.Day(), 9, 30, 0, 0, v.DateTime.Location())
-							v.Last = trans[0].Price
+							v.PreClose = trans[0].Price
 							data.RiseRate = data.GetRiseRate()
 							data.RisePrice = data.GetRisePrice()
 							list = append(list, data)
@@ -178,11 +178,11 @@ func (client *Client) StockKLine930(category uint16, market uint8, code string, 
 							data.High = trans[0].Price
 							data.Low = trans[0].Price
 							data.Close = trans[0].Price
-							data.Last = v.Last
+							data.PreClose = v.PreClose
 							data.Vol = cast.ToFloat64(trans[0].Vol)
 							data.Amount = cast.ToFloat64(trans[0].Vol) * trans[0].Price * 100
 							data.DateTime = time.Date(v.DateTime.Year(), v.DateTime.Month(), v.DateTime.Day(), 9, 30, 0, 0, v.DateTime.Location())
-							v.Last = trans[0].Price
+							v.PreClose = trans[0].Price
 							data.RiseRate = data.GetRiseRate()
 							data.RisePrice = data.GetRisePrice()
 							list = append(list, data)

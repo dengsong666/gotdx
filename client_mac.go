@@ -83,6 +83,11 @@ func (client *Client) GetMACBoardMembersQuotes(boardSymbol string, sortType uint
 
 // GetMACBoardMembersQuotesDynamic 获取按位图动态解析的 MAC 板块成分报价。
 func (client *Client) GetMACBoardMembersQuotesDynamic(boardSymbol string, sortType uint16, start uint32, pageSize uint8, sortOrder uint8, fieldBitmap [20]byte) (*proto.MACBoardMembersQuotesDynamicReply, error) {
+	return client.GetMACBoardMembersQuotesDynamicWithFilter(boardSymbol, sortType, start, pageSize, sortOrder, fieldBitmap, 0)
+}
+
+// GetMACBoardMembersQuotesDynamicWithFilter 获取按位图动态解析的 MAC 板块成分报价，并设置排除过滤位。
+func (client *Client) GetMACBoardMembersQuotesDynamicWithFilter(boardSymbol string, sortType uint16, start uint32, pageSize uint8, sortOrder uint8, fieldBitmap [20]byte, filter uint8) (*proto.MACBoardMembersQuotesDynamicReply, error) {
 	boardCode, err := protoExchangeBoardCode(boardSymbol)
 	if err != nil {
 		return nil, err
@@ -93,6 +98,7 @@ func (client *Client) GetMACBoardMembersQuotesDynamic(boardSymbol string, sortTy
 		Start:       start,
 		PageSize:    pageSize,
 		SortOrder:   sortOrder,
+		Filter:      filter,
 		FieldBitmap: fieldBitmap,
 	})
 	return executeProtocol(client, obj)
@@ -341,6 +347,11 @@ func (client *Client) MACBoardMembersQuotes(boardSymbol string, count uint32) ([
 
 // MACBoardMembersQuotesDynamic 获取按位图动态解析的 MAC 板块成分报价。
 func (client *Client) MACBoardMembersQuotesDynamic(boardSymbol string, count uint32, sortType uint16, sortOrder uint8, fieldBitmap [20]byte) (*proto.MACBoardMembersQuotesDynamicReply, error) {
+	return client.MACBoardMembersQuotesDynamicWithFilter(boardSymbol, count, sortType, sortOrder, fieldBitmap)
+}
+
+// MACBoardMembersQuotesDynamicWithFilter 获取按位图动态解析的 MAC 板块成分报价，并支持排除过滤条件。
+func (client *Client) MACBoardMembersQuotesDynamicWithFilter(boardSymbol string, count uint32, sortType uint16, sortOrder uint8, fieldBitmap [20]byte, filters ...MACFilterType) (*proto.MACBoardMembersQuotesDynamicReply, error) {
 	if count == 0 {
 		count = DefaultMACBoardStockCount
 	}
@@ -355,7 +366,7 @@ func (client *Client) MACBoardMembersQuotesDynamic(boardSymbol string, count uin
 		if remaining < uint32(pageSize) {
 			pageSize = uint8(remaining)
 		}
-		reply, err := client.GetMACBoardMembersQuotesDynamic(boardSymbol, sortType, start, pageSize, sortOrder, fieldBitmap)
+		reply, err := client.GetMACBoardMembersQuotesDynamicWithFilter(boardSymbol, sortType, start, pageSize, sortOrder, fieldBitmap, MACFilterFlags(filters...))
 		if err != nil {
 			return nil, err
 		}

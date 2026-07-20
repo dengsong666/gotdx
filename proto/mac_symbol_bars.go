@@ -68,7 +68,8 @@ type MACSymbolBar struct {
 	Vol         float64
 	FloatShares float64
 	Turnover    float64
-	Last        float64
+	PreClose    float64 // 昨收价
+	LastClose   float64 // 前收价
 	RisePrice   float64 // 涨跌价
 	RiseRate    float64 // 涨跌幅
 }
@@ -134,7 +135,7 @@ func (obj *MACSymbolBars) ParseResponse(header *RespHeader, data []byte) error {
 
 	formatTDXTime := obj.reply.Period < 4 || obj.reply.Period == 7 || obj.reply.Period == 8
 	pos := 33
-	var lastRaw float64 // 昨收盘价
+	var preCloseRaw float64 // 昨收盘价
 	for i := uint16(0); i < obj.reply.Count; i++ {
 		if pos+36 > len(data) {
 			return fmt.Errorf("invalid mac symbol bar item %d", i)
@@ -151,8 +152,9 @@ func (obj *MACSymbolBars) ParseResponse(header *RespHeader, data []byte) error {
 			Vol:         float64(math.Float32frombits(binary.LittleEndian.Uint32(data[pos+28 : pos+32]))),
 			FloatShares: float64(math.Float32frombits(binary.LittleEndian.Uint32(data[pos+32 : pos+36]))),
 		}
-		item.Last = lastRaw
-		lastRaw = item.Close
+		item.PreClose = preCloseRaw
+		item.LastClose = preCloseRaw
+		preCloseRaw = item.Close
 		item.RiseRate = item.GetRiseRate()
 		item.RisePrice = item.GetRisePrice()
 		pos += 36
@@ -191,19 +193,19 @@ func (obj *MACSymbolBars) ParseResponse(header *RespHeader, data []byte) error {
 }
 
 func (bar MACSymbolBar) GetRisePrice() float64 {
-	if bar.Last == 0 {
+	if bar.PreClose == 0 {
 		//稍微数据准确点，没减去0这么夸张，还是不准的
 		return bar.Close - bar.Open
 	}
-	return bar.Close - bar.Last
+	return bar.Close - bar.PreClose
 }
 
 // RiseRate 涨跌比例/涨跌幅
 func (bar MACSymbolBar) GetRiseRate() float64 {
-	if bar.Last == 0 {
+	if bar.PreClose == 0 {
 		return (bar.Close - bar.Open) / (bar.Open) * 100
 	}
-	return (bar.Close - bar.Last) / (bar.Last) * 100
+	return (bar.Close - bar.PreClose) / (bar.PreClose) * 100
 }
 
 func (obj *MACSymbolBars) Response() *MACSymbolBarsReply {

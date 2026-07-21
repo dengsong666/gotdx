@@ -4,6 +4,7 @@ package routes
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"math"
 	"net/http"
 	"sort"
@@ -22,6 +23,7 @@ const (
 	defaultStockUnusualPollInterval      = 2 * time.Second
 	defaultStockUnusualHeartbeatInterval = time.Minute
 	stockUnusualMonitorCount             = uint32(600)
+	stockUnusualMaxStart                 = uint32(^uint16(0))
 	stockUnusualMaxStocks                = 100
 	stockUnusualSubscriberBuffer         = 128
 )
@@ -32,6 +34,10 @@ var shanghaiLocation = time.FixedZone("Asia/Shanghai", 8*60*60)
 // *gotdx.Client 已经实现这个接口，测试也可以传入假的行情客户端。
 type MACMarketMonitorClient interface {
 	MACMarketMonitor(market uint8, start uint32, count uint32) ([]proto.MACMarketMonitorItem, error)
+}
+
+type macMarketMonitorDisconnector interface {
+	Disconnect() error
 }
 
 // StockUnusualSSEOption 用于修改 SSE 路由的可选配置。
@@ -125,6 +131,7 @@ type stockUnusualMarketState struct {
 	date        string
 	initialized bool
 	inError     bool
+	nextStart   uint32
 	seen        map[unusualEventKey]struct{}
 }
 
@@ -323,12 +330,7 @@ func (handler *stockUnusualSSEHandler) runPollLoop() {
 			return
 		}
 		for _, market := range markets {
-			items, err := handler.client.MACMarketMonitor(market, 0, stockUnusualMonitorCount)
-			if err != nil {
-				handler.handlePollError(market)
-				continue
-			}
-			handler.handlePollSuccess(market, items)
+			handler.pollMarket(market)
 		}
 
 		timer := time.NewTimer(handler.config.pollInterval)
@@ -343,6 +345,129 @@ func (handler *stockUnusualSSEHandler) runPollLoop() {
 			}
 		}
 	}
+}
+
+func (handler *stockUnusualSSEHandler) pollMarket(market uint8) {
+	today := handler.now().In(shanghaiLocation).Format(time.DateOnly)
+
+	handler.mu.Lock()
+	state := handler.states[market]
+	if state == nil {
+		handler.mu.Unlock()
+		return
+	}
+	needsBaseline := !state.initialized || state.date != today
+	start := state.nextStart
+	handler.mu.Unlock()
+
+	if needsBaseline {
+		nextStart, err := handler.findMarketTail(market)
+		if err != nil {
+			handler.handlePollError(market, err)
+			return
+		}
+		handler.handleBaseline(market, today, nextStart)
+		return
+	}
+
+	for {
+		items, err := handler.queryMarketMonitor(market, start, stockUnusualMonitorCount)
+		if err != nil {
+			handler.handlePollError(market, err)
+			return
+		}
+		if !handler.handlePollItems(market, today, start, items) {
+			return
+		}
+		if len(items) < int(stockUnusualMonitorCount) {
+			return
+		}
+		start += uint32(len(items))
+	}
+}
+
+func (handler *stockUnusualSSEHandler) queryMarketMonitor(market uint8, start uint32, count uint32) ([]proto.MACMarketMonitorItem, error) {
+	if handler.client == nil {
+		return nil, fmt.Errorf("MAC 行情客户端不可用")
+	}
+	if disconnector, ok := handler.client.(macMarketMonitorDisconnector); ok {
+		defer disconnector.Disconnect()
+	}
+	items, err := handler.client.MACMarketMonitor(market, start, count)
+	if err != nil {
+		return nil, fmt.Errorf("market=%d start=%d count=%d: %w", market, start, count, err)
+	}
+	return items, nil
+}
+
+func (handler *stockUnusualSSEHandler) findMarketTail(market uint8) (uint32, error) {
+	pageSize := stockUnusualMonitorCount
+	pageLengths := make(map[uint32]int)
+	queryPage := func(page uint32) (int, error) {
+		if length, ok := pageLengths[page]; ok {
+			return length, nil
+		}
+		start := page * pageSize
+		if start > stockUnusualMaxStart {
+			return 0, fmt.Errorf("市场异动游标超过协议上限: %d", start)
+		}
+		items, err := handler.queryMarketMonitor(market, start, pageSize)
+		if err != nil {
+			return 0, err
+		}
+		pageLengths[page] = len(items)
+		return len(items), nil
+	}
+
+	firstLength, err := queryPage(0)
+	if err != nil {
+		return 0, err
+	}
+	if firstLength < int(pageSize) {
+		return uint32(firstLength), nil
+	}
+
+	lowPage := uint32(0)
+	highPage := uint32(1)
+	maxPage := stockUnusualMaxStart / pageSize
+	for {
+		if highPage > maxPage {
+			highPage = maxPage
+		}
+		length, err := queryPage(highPage)
+		if err != nil {
+			return 0, err
+		}
+		if length < int(pageSize) {
+			break
+		}
+		if highPage == maxPage {
+			return 0, fmt.Errorf("市场异动数量达到协议游标上限")
+		}
+		lowPage = highPage
+		highPage *= 2
+	}
+
+	left := lowPage + 1
+	right := highPage
+	for left < right {
+		middle := left + (right-left)/2
+		length, err := queryPage(middle)
+		if err != nil {
+			return 0, err
+		}
+		if length == int(pageSize) {
+			left = middle + 1
+		} else {
+			right = middle
+		}
+	}
+
+	tailLength, err := queryPage(left)
+	if err != nil {
+		return 0, err
+	}
+	return left*pageSize + uint32(tailLength), nil
 }
 
 func (handler *stockUnusualSSEHandler) activeMarkets() ([]uint8, bool) {
@@ -365,7 +490,7 @@ func (handler *stockUnusualSSEHandler) activeMarkets() ([]uint8, bool) {
 	return markets, true
 }
 
-func (handler *stockUnusualSSEHandler) handlePollError(market uint8) {
+func (handler *stockUnusualSSEHandler) handlePollError(market uint8, pollErr error) {
 	handler.mu.Lock()
 	defer handler.mu.Unlock()
 	state := handler.states[market]
@@ -377,6 +502,7 @@ func (handler *stockUnusualSSEHandler) handlePollError(market uint8) {
 		return
 	}
 	state.inError = true
+	log.Printf("stock unusual poll failed: %v", pollErr)
 
 	message := stockUnusualErrorMessage()
 	for subscriber := range handler.subscribers {
@@ -391,33 +517,41 @@ func (handler *stockUnusualSSEHandler) handlePollError(market uint8) {
 	}
 }
 
-func (handler *stockUnusualSSEHandler) handlePollSuccess(market uint8, items []proto.MACMarketMonitorItem) {
-	today := handler.now().In(shanghaiLocation).Format(time.DateOnly)
-
+func (handler *stockUnusualSSEHandler) handleBaseline(market uint8, today string, nextStart uint32) {
 	handler.mu.Lock()
 	defer handler.mu.Unlock()
 	state := handler.states[market]
 	if state == nil {
 		return
 	}
+	state.date = today
+	state.initialized = true
+	state.nextStart = nextStart
+	state.seen = make(map[unusualEventKey]struct{})
 	if state.inError {
 		state.inError = false
 		for subscriber := range handler.subscribers {
 			delete(subscriber.failedMarkets, market)
 		}
 	}
-	if state.date != today {
-		state.date = today
-		state.initialized = false
+}
+
+func (handler *stockUnusualSSEHandler) handlePollItems(market uint8, today string, start uint32, items []proto.MACMarketMonitorItem) bool {
+	handler.mu.Lock()
+	defer handler.mu.Unlock()
+	state := handler.states[market]
+	if state == nil || !state.initialized || state.date != today || state.nextStart != start {
+		return false
 	}
-	if !state.initialized {
-		state.seen = make(map[unusualEventKey]struct{}, len(items))
-		for _, item := range items {
-			state.seen[makeUnusualEventKey(market, item)] = struct{}{}
+
+	nextStart := start + uint32(len(items))
+	for _, item := range items {
+		itemNextStart := uint32(item.Index) + 1
+		if itemNextStart > nextStart {
+			nextStart = itemNextStart
 		}
-		state.initialized = true
-		return
 	}
+	state.nextStart = nextStart
 
 	for _, item := range items {
 		key := makeUnusualEventKey(market, item)
@@ -439,6 +573,7 @@ func (handler *stockUnusualSSEHandler) handlePollSuccess(market uint8, items []p
 			handler.enqueueLocked(subscriber, message)
 		}
 	}
+	return true
 }
 
 func makeUnusualEventKey(market uint8, item proto.MACMarketMonitorItem) unusualEventKey {

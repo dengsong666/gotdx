@@ -23,15 +23,23 @@ type monitorResult struct {
 	err   error
 }
 
+type monitorCall struct {
+	market uint8
+	start  uint32
+	count  uint32
+}
+
 type sequenceMonitorClient struct {
-	mu        sync.Mutex
-	sequences map[uint8][]monitorResult
-	calls     map[uint8]int
+	mu          sync.Mutex
+	sequences   map[uint8][]monitorResult
+	calls       map[uint8]int
+	callHistory []monitorCall
+	disconnects int
 }
 
 func (client *sequenceMonitorClient) MACMarketMonitor(market uint8, start uint32, count uint32) ([]proto.MACMarketMonitorItem, error) {
-	if start != 0 || count != stockUnusualMonitorCount {
-		return nil, fmt.Errorf("unexpected monitor range: start=%d count=%d", start, count)
+	if count != stockUnusualMonitorCount {
+		return nil, fmt.Errorf("unexpected monitor count: %d", count)
 	}
 	client.mu.Lock()
 	defer client.mu.Unlock()
@@ -40,21 +48,70 @@ func (client *sequenceMonitorClient) MACMarketMonitor(market uint8, start uint32
 	}
 	index := client.calls[market]
 	client.calls[market]++
+	client.callHistory = append(client.callHistory, monitorCall{market: market, start: start, count: count})
 	sequence := client.sequences[market]
-	if len(sequence) == 0 {
-		return nil, nil
-	}
 	if index >= len(sequence) {
-		index = len(sequence) - 1
+		return nil, nil
 	}
 	result := sequence[index]
 	return append([]proto.MACMarketMonitorItem(nil), result.items...), result.err
+}
+
+func (client *sequenceMonitorClient) Disconnect() error {
+	client.mu.Lock()
+	client.disconnects++
+	client.mu.Unlock()
+	return nil
 }
 
 func (client *sequenceMonitorClient) callCount(market uint8) int {
 	client.mu.Lock()
 	defer client.mu.Unlock()
 	return client.calls[market]
+}
+
+func (client *sequenceMonitorClient) history() ([]monitorCall, int) {
+	client.mu.Lock()
+	defer client.mu.Unlock()
+	return append([]monitorCall(nil), client.callHistory...), client.disconnects
+}
+
+type pagedMonitorClient struct {
+	mu          sync.Mutex
+	total       uint32
+	calls       []monitorCall
+	disconnects int
+}
+
+func (client *pagedMonitorClient) MACMarketMonitor(market uint8, start uint32, count uint32) ([]proto.MACMarketMonitorItem, error) {
+	client.mu.Lock()
+	client.calls = append(client.calls, monitorCall{market: market, start: start, count: count})
+	client.mu.Unlock()
+	if start >= client.total {
+		return nil, nil
+	}
+	length := count
+	if remaining := client.total - start; remaining < length {
+		length = remaining
+	}
+	items := make([]proto.MACMarketMonitorItem, length)
+	for index := range items {
+		items[index].Index = uint16(start + uint32(index))
+	}
+	return items, nil
+}
+
+func (client *pagedMonitorClient) Disconnect() error {
+	client.mu.Lock()
+	client.disconnects++
+	client.mu.Unlock()
+	return nil
+}
+
+func (client *pagedMonitorClient) stats() ([]monitorCall, int) {
+	client.mu.Lock()
+	defer client.mu.Unlock()
+	return append([]monitorCall(nil), client.calls...), client.disconnects
 }
 
 type blockingMonitorClient struct {
@@ -128,6 +185,71 @@ func TestStockUnusualSSEOptions(t *testing.T) {
 	}
 }
 
+func TestFindMarketTail(t *testing.T) {
+	for _, total := range []uint32{0, 1, 599, 600, 601, 23662} {
+		t.Run(fmt.Sprintf("total_%d", total), func(t *testing.T) {
+			client := &pagedMonitorClient{total: total}
+			handler := newStockUnusualSSEHandler(client, testSSEConfig())
+
+			tail, err := handler.findMarketTail(types.MarketSZ.Uint8())
+			if err != nil {
+				t.Fatalf("find market tail failed: %v", err)
+			}
+			if tail != total {
+				t.Fatalf("unexpected tail: got=%d want=%d", tail, total)
+			}
+
+			calls, disconnects := client.stats()
+			if disconnects != len(calls) {
+				t.Fatalf("every tail query must disconnect: calls=%d disconnects=%d", len(calls), disconnects)
+			}
+			if total == 23662 && len(calls) >= 20 {
+				t.Fatalf("tail lookup used too many requests: %d", len(calls))
+			}
+		})
+	}
+}
+
+func TestPollMarketDrainsFullPages(t *testing.T) {
+	firstPage := make([]proto.MACMarketMonitorItem, stockUnusualMonitorCount)
+	for index := range firstPage {
+		firstPage[index] = testUnusualItem(uint16(1000+index), "14:30:00", fmt.Sprintf("异动%d", index))
+	}
+	lastPage := []proto.MACMarketMonitorItem{
+		testUnusualItem(1600, "14:30:01", "新增1"),
+		testUnusualItem(1601, "14:30:02", "新增2"),
+	}
+	market := types.MarketSZ.Uint8()
+	client := &sequenceMonitorClient{sequences: map[uint8][]monitorResult{
+		market: {
+			{items: firstPage},
+			{items: lastPage},
+		},
+	}}
+	handler := newStockUnusualSSEHandler(client, testSSEConfig())
+	today := handler.now().In(shanghaiLocation).Format(time.DateOnly)
+	handler.states[market] = &stockUnusualMarketState{
+		date:        today,
+		initialized: true,
+		nextStart:   1000,
+		seen:        make(map[unusualEventKey]struct{}),
+	}
+
+	handler.pollMarket(market)
+
+	state := handler.states[market]
+	if state.nextStart != 1602 {
+		t.Fatalf("unexpected cursor after draining pages: %d", state.nextStart)
+	}
+	history, disconnects := client.history()
+	if len(history) != 2 || history[0].start != 1000 || history[1].start != 1600 {
+		t.Fatalf("unexpected drain history: %+v", history)
+	}
+	if disconnects != len(history) {
+		t.Fatalf("every drained page must disconnect: calls=%d disconnects=%d", len(history), disconnects)
+	}
+}
+
 func TestStockUnusualSSEHTTPValidation(t *testing.T) {
 	mux := http.NewServeMux()
 	RegisterStockUnusualSSE(mux, &sequenceMonitorClient{})
@@ -148,14 +270,14 @@ func TestStockUnusualSSEHTTPValidation(t *testing.T) {
 }
 
 func TestStockUnusualSSEBuildsBaselineAndStreamsNewItems(t *testing.T) {
-	oldItem := testUnusualItem(1, "09:30:00", "加速拉升")
-	newItem1 := testUnusualItem(2, "09:31:00", "大单托盘")
-	newItem2 := testUnusualItem(3, "09:32:00", "主力买入")
+	oldItem := testUnusualItem(0, "09:30:00", "加速拉升")
+	newItem1 := testUnusualItem(1, "09:31:00", "大单托盘")
+	newItem2 := testUnusualItem(2, "09:32:00", "主力买入")
 	client := &sequenceMonitorClient{
 		sequences: map[uint8][]monitorResult{
 			types.MarketSZ.Uint8(): {
 				{items: []proto.MACMarketMonitorItem{oldItem}},
-				{items: []proto.MACMarketMonitorItem{oldItem, newItem1, newItem2}},
+				{items: []proto.MACMarketMonitorItem{newItem1, newItem2}},
 			},
 		},
 	}
@@ -229,6 +351,13 @@ func TestStockUnusualSSEBuildsBaselineAndStreamsNewItems(t *testing.T) {
 	if client.callCount(types.MarketSZ.Uint8()) < 2 {
 		t.Fatalf("expected at least two polls, got %d", client.callCount(types.MarketSZ.Uint8()))
 	}
+	history, disconnects := client.history()
+	if len(history) < 2 || history[0].start != 0 || history[1].start != 1 {
+		t.Fatalf("unexpected cursor history: %+v", history)
+	}
+	if disconnects != len(history) {
+		t.Fatalf("every MAC query must disconnect: calls=%d disconnects=%d", len(history), disconnects)
+	}
 }
 
 func TestStockUnusualSSEConnectionsSharePolling(t *testing.T) {
@@ -277,8 +406,8 @@ func TestStockUnusualSSEErrorOnlyOnceAndRecoveryRebuildsBaseline(t *testing.T) {
 		{market: types.MarketSZ.Uint8(), code: "000001"}: {},
 	})
 
-	handler.handlePollError(types.MarketSZ.Uint8())
-	handler.handlePollError(types.MarketSZ.Uint8())
+	handler.handlePollError(types.MarketSZ.Uint8(), errors.New("第一次失败"))
+	handler.handlePollError(types.MarketSZ.Uint8(), errors.New("重复失败"))
 	if len(subscriber.messages) != 1 {
 		t.Fatalf("same error should be sent once, got %d", len(subscriber.messages))
 	}
@@ -287,14 +416,13 @@ func TestStockUnusualSSEErrorOnlyOnceAndRecoveryRebuildsBaseline(t *testing.T) {
 		t.Fatalf("unexpected error event: %+v", message)
 	}
 
-	oldItem := testUnusualItem(1, "09:30:00", "旧异动")
-	missedItem := testUnusualItem(2, "09:31:00", "错误期间异动")
-	handler.handlePollSuccess(types.MarketSZ.Uint8(), []proto.MACMarketMonitorItem{oldItem, missedItem})
+	today := handler.now().In(shanghaiLocation).Format(time.DateOnly)
+	handler.handleBaseline(types.MarketSZ.Uint8(), today, 2)
 	if len(subscriber.messages) != 0 {
 		t.Fatalf("recovery must rebuild baseline without replay, got %d messages", len(subscriber.messages))
 	}
 
-	handler.handlePollError(types.MarketSZ.Uint8())
+	handler.handlePollError(types.MarketSZ.Uint8(), errors.New("恢复后再次失败"))
 	if len(subscriber.messages) != 1 {
 		t.Fatalf("error after recovery should be sent again, got %d", len(subscriber.messages))
 	}
@@ -316,18 +444,24 @@ func TestStockUnusualSSEDailyResetAndDedup(t *testing.T) {
 	state := handler.states[types.MarketSZ.Uint8()]
 	state.date = "2026-07-20"
 	state.initialized = true
+	state.nextStart = 2
 	state.seen[makeUnusualEventKey(types.MarketSZ.Uint8(), oldItem)] = struct{}{}
 	handler.mu.Unlock()
 
-	handler.handlePollSuccess(types.MarketSZ.Uint8(), []proto.MACMarketMonitorItem{oldItem})
+	today := handler.now().In(shanghaiLocation).Format(time.DateOnly)
+	handler.handleBaseline(types.MarketSZ.Uint8(), today, 2)
 	if len(subscriber.messages) != 0 {
 		t.Fatalf("first poll after date change must rebuild baseline")
 	}
-	handler.handlePollSuccess(types.MarketSZ.Uint8(), []proto.MACMarketMonitorItem{oldItem, newItem})
+	if !handler.handlePollItems(types.MarketSZ.Uint8(), today, 2, []proto.MACMarketMonitorItem{newItem}) {
+		t.Fatal("new daily item was not accepted")
+	}
 	if len(subscriber.messages) != 1 {
 		t.Fatalf("expected one new event, got %d", len(subscriber.messages))
 	}
-	handler.handlePollSuccess(types.MarketSZ.Uint8(), []proto.MACMarketMonitorItem{oldItem, newItem})
+	if handler.handlePollItems(types.MarketSZ.Uint8(), today, 2, []proto.MACMarketMonitorItem{newItem}) {
+		t.Fatal("stale cursor should be rejected")
+	}
 	if len(subscriber.messages) != 1 {
 		t.Fatalf("duplicate event was sent again, got %d", len(subscriber.messages))
 	}
@@ -343,13 +477,14 @@ func TestStockUnusualSSESlowSubscriberIsDisconnected(t *testing.T) {
 	state := handler.states[types.MarketSZ.Uint8()]
 	state.date = handler.now().In(shanghaiLocation).Format(time.DateOnly)
 	state.initialized = true
+	state.nextStart = 0
 	handler.mu.Unlock()
 
 	items := make([]proto.MACMarketMonitorItem, 0, stockUnusualSubscriberBuffer+1)
 	for i := 0; i <= stockUnusualSubscriberBuffer; i++ {
 		items = append(items, testUnusualItem(uint16(i+1), "09:30:00", fmt.Sprintf("异动%d", i)))
 	}
-	handler.handlePollSuccess(types.MarketSZ.Uint8(), items)
+	handler.handlePollItems(types.MarketSZ.Uint8(), state.date, 0, items)
 
 	select {
 	case <-subscriber.done:

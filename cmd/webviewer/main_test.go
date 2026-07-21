@@ -27,7 +27,7 @@ func TestHandleIndex(t *testing.T) {
 }
 
 func TestHandleMethods(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/api/methods", nil)
+	req := httptest.NewRequest(http.MethodGet, "/web/api/methods", nil)
 	rec := httptest.NewRecorder()
 
 	handleMethods(rec, req)
@@ -48,7 +48,7 @@ func TestHandleMethods(t *testing.T) {
 }
 
 func TestHandleQueryRejectsUnknownMethod(t *testing.T) {
-	req := httptest.NewRequest(http.MethodPost, "/api/query", strings.NewReader(`{"method":"missing","params":{}}`))
+	req := httptest.NewRequest(http.MethodPost, "/web/api/query", strings.NewReader(`{"method":"missing","params":{}}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 

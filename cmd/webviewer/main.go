@@ -6,16 +6,22 @@ import (
 	"log"
 	"net/http"
 	"os"
+
+	"github.com/bensema/gotdx/routes"
 )
 
 //go:embed index.html
 var assets embed.FS
 
 func main() {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", handleIndex)
-	mux.HandleFunc("/api/methods", handleMethods)
-	mux.HandleFunc("/api/query", handleQuery)
+	webMux := http.NewServeMux()
+	webMux.HandleFunc("/", handleIndex)
+	webMux.HandleFunc("/api/methods", handleMethods)
+	webMux.HandleFunc("/api/query", handleQuery)
+
+	macClient := newMACClient()
+	defer macClient.Disconnect()
+	handler := routes.NewRootHandler(webMux, macClient)
 
 	addr := os.Getenv("GOTDX_WEB_ADDR")
 	if addr == "" {
@@ -23,7 +29,7 @@ func main() {
 	}
 
 	log.Printf("gotdx webviewer listening on http://%s", addr)
-	if err := http.ListenAndServe(addr, withCORS(withLogging(mux))); err != nil {
+	if err := http.ListenAndServe(addr, withLogging(handler)); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -73,19 +79,6 @@ func handleQuery(w http.ResponseWriter, r *http.Request) {
 func withLogging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("%s %s", r.Method, r.URL.Path)
-		next.ServeHTTP(w, r)
-	})
-}
-
-func withCORS(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
 		next.ServeHTTP(w, r)
 	})
 }

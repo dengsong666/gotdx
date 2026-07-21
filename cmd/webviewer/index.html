@@ -767,11 +767,11 @@
         <div class="market-grid">
           <div class="market-row">
             <p class="market-label">接口注册表</p>
-            <p class="market-value">左侧分组来自 /api/methods 接口返回</p>
+            <p class="market-value">左侧分组来自 /web/api/methods 接口返回</p>
           </div>
           <div class="market-row">
             <p class="market-label">执行链路</p>
-            <p class="market-value">POST /api/query 返回表格行和原始响应</p>
+            <p class="market-value">POST /web/api/query 返回表格行和原始响应</p>
           </div>
           <div class="market-row">
             <p class="market-label">表格展示</p>
@@ -901,7 +901,7 @@
 
     async function boot() {
       try {
-        state.methods = await fetchJSON('/api/methods');
+        state.methods = await fetchJSON('/web/api/methods');
         if (!Array.isArray(state.methods) || state.methods.length === 0) {
           throw new Error('接口注册表为空');
         }
@@ -1179,7 +1179,7 @@
       document.getElementById('runStatus').innerHTML = '<strong>执行中</strong> 正在请求远程主机...';
 
       try {
-        const response = await fetchJSON('/api/query', {
+        const response = await fetchJSON('/web/api/query', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ method: method.key, params }),

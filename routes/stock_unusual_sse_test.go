@@ -475,6 +475,48 @@ func TestStockUnusualSSEErrorOnlyOnceAndRecoveryRebuildsBaseline(t *testing.T) {
 	handler.unsubscribe(subscriber)
 }
 
+func TestStockUnusualSSERecoveryContinuesFromCursor(t *testing.T) {
+	market := types.MarketSZ.Uint8()
+	today := time.Now().In(shanghaiLocation).Format(time.DateOnly)
+	oldItem := testUnusualItem(10, "10:30:00", "旧异动")
+	newItem := testUnusualItem(11, "10:30:02", "恢复期间异动")
+	client := &sequenceMonitorClient{}
+	handler := newStockUnusualSSEHandler(client, testSSEConfig())
+	handler.now = func() time.Time { return time.Now().In(shanghaiLocation) }
+	subscriber := attachTestSubscriber(handler, map[stockTarget]struct{}{
+		{market: market, code: "000001"}: {},
+	})
+
+	handler.mu.Lock()
+	state := handler.states[market]
+	state.date = today
+	state.initialized = true
+	state.nextStart = 10
+	state.seen[makeUnusualEventKey(market, oldItem)] = struct{}{}
+	handler.mu.Unlock()
+
+	handler.handlePollError(market, errors.New("临时超时"))
+	if !state.initialized || state.nextStart != 10 {
+		t.Fatalf("poll error must preserve active cursor: initialized=%v nextStart=%d", state.initialized, state.nextStart)
+	}
+	if !handler.handlePollItems(market, today, 10, []proto.MACMarketMonitorItem{newItem}) {
+		t.Fatal("recovery query should continue from the previous cursor")
+	}
+	if len(subscriber.messages) != 2 {
+		t.Fatalf("expected error plus recovered event, got %d", len(subscriber.messages))
+	}
+	if message := <-subscriber.messages; message.event != "error" {
+		t.Fatalf("expected initial error event, got %+v", message)
+	}
+	if message := <-subscriber.messages; message.event != "unusual" {
+		t.Fatalf("expected recovered unusual event, got %+v", message)
+	}
+	if state.inError {
+		t.Fatal("successful recovery should clear market error state")
+	}
+	handler.unsubscribe(subscriber)
+}
+
 func TestStockUnusualSSEDailyResetAndDedup(t *testing.T) {
 	handler := newStockUnusualSSEHandler(&sequenceMonitorClient{}, testSSEConfig())
 	handler.now = func() time.Time {

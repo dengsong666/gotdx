@@ -19,7 +19,7 @@ func main() {
 	webMux.HandleFunc("/api/methods", handleMethods)
 	webMux.HandleFunc("/api/query", handleQuery)
 
-	macClient := newMACClient()
+	macClient := newMACSSEClient()
 	defer macClient.Disconnect()
 	handler := routes.NewRootHandler(webMux, macClient)
 

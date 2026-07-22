@@ -518,7 +518,6 @@ func (handler *stockUnusualSSEHandler) handlePollError(market uint8, pollErr err
 	if state == nil {
 		return
 	}
-	state.initialized = false
 	if state.inError {
 		return
 	}
@@ -563,6 +562,12 @@ func (handler *stockUnusualSSEHandler) handlePollItems(market uint8, today strin
 	state := handler.states[market]
 	if state == nil || !state.initialized || state.date != today || state.nextStart != start {
 		return false
+	}
+	if state.inError {
+		state.inError = false
+		for subscriber := range handler.subscribers {
+			delete(subscriber.failedMarkets, market)
+		}
 	}
 
 	nextStart := start + uint32(len(items))

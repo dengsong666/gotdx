@@ -185,6 +185,52 @@ func TestStockUnusualSSEOptions(t *testing.T) {
 	}
 }
 
+func TestQueryMarketMonitorRetriesTransientErrors(t *testing.T) {
+	market := types.MarketSZ.Uint8()
+	want := testUnusualItem(42, "10:30:00", "加速拉升")
+	client := &sequenceMonitorClient{sequences: map[uint8][]monitorResult{
+		market: {
+			{err: errors.New("第一次超时")},
+			{err: errors.New("第二次超时")},
+			{items: []proto.MACMarketMonitorItem{want}},
+		},
+	}}
+	handler := newStockUnusualSSEHandler(client, testSSEConfig())
+
+	items, err := handler.queryMarketMonitor(market, 600, stockUnusualMonitorCount)
+	if err != nil {
+		t.Fatalf("transient failures should recover: %v", err)
+	}
+	if len(items) != 1 || items[0].Index != want.Index {
+		t.Fatalf("unexpected recovered items: %+v", items)
+	}
+	history, disconnects := client.history()
+	if len(history) != stockUnusualPollAttempts || disconnects != len(history) {
+		t.Fatalf("unexpected retry stats: calls=%d disconnects=%d", len(history), disconnects)
+	}
+}
+
+func TestQueryMarketMonitorReturnsErrorAfterRetries(t *testing.T) {
+	market := types.MarketSH.Uint8()
+	client := &sequenceMonitorClient{sequences: map[uint8][]monitorResult{
+		market: {
+			{err: errors.New("持续超时")},
+			{err: errors.New("持续超时")},
+			{err: errors.New("持续超时")},
+		},
+	}}
+	handler := newStockUnusualSSEHandler(client, testSSEConfig())
+
+	_, err := handler.queryMarketMonitor(market, 1200, stockUnusualMonitorCount)
+	if err == nil || !strings.Contains(err.Error(), "failed after 3 attempts") {
+		t.Fatalf("expected exhausted retry error, got: %v", err)
+	}
+	history, disconnects := client.history()
+	if len(history) != stockUnusualPollAttempts || disconnects != len(history) {
+		t.Fatalf("unexpected retry stats: calls=%d disconnects=%d", len(history), disconnects)
+	}
+}
+
 func TestFindMarketTail(t *testing.T) {
 	for _, total := range []uint32{0, 1, 599, 600, 601, 23662} {
 		t.Run(fmt.Sprintf("total_%d", total), func(t *testing.T) {

@@ -26,6 +26,7 @@ const (
 	stockUnusualMaxStart                 = uint32(^uint16(0))
 	stockUnusualMaxStocks                = 100
 	stockUnusualSubscriberBuffer         = 128
+	stockUnusualPollAttempts             = 3
 )
 
 var shanghaiLocation = time.FixedZone("Asia/Shanghai", 8*60*60)
@@ -390,14 +391,34 @@ func (handler *stockUnusualSSEHandler) queryMarketMonitor(market uint8, start ui
 	if handler.client == nil {
 		return nil, fmt.Errorf("MAC 行情客户端不可用")
 	}
-	if disconnector, ok := handler.client.(macMarketMonitorDisconnector); ok {
-		defer disconnector.Disconnect()
+	var lastErr error
+	for attempt := 1; attempt <= stockUnusualPollAttempts; attempt++ {
+		items, err := handler.client.MACMarketMonitor(market, start, count)
+		if disconnector, ok := handler.client.(macMarketMonitorDisconnector); ok {
+			_ = disconnector.Disconnect()
+		}
+		if err == nil {
+			return items, nil
+		}
+		lastErr = err
+		log.Printf(
+			"stock unusual query failed: market=%d start=%d count=%d attempt=%d/%d: %v",
+			market,
+			start,
+			count,
+			attempt,
+			stockUnusualPollAttempts,
+			err,
+		)
 	}
-	items, err := handler.client.MACMarketMonitor(market, start, count)
-	if err != nil {
-		return nil, fmt.Errorf("market=%d start=%d count=%d: %w", market, start, count, err)
-	}
-	return items, nil
+	return nil, fmt.Errorf(
+		"market=%d start=%d count=%d failed after %d attempts: %w",
+		market,
+		start,
+		count,
+		stockUnusualPollAttempts,
+		lastErr,
+	)
 }
 
 func (handler *stockUnusualSSEHandler) findMarketTail(market uint8) (uint32, error) {
